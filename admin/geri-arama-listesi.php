@@ -1,5 +1,27 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'Geri Arama Listesi - Otomatik Arama Yönetimi';
+
+// Geri arama listesini çek
+$callbacks = fetchAll("
+    SELECT
+        cb.*,
+        u.name,
+        u.surname,
+        u.phone,
+        u.tckn
+    FROM callbacks cb
+    LEFT JOIN users u ON cb.user_id = u.id
+    ORDER BY cb.scheduled_time ASC
+");
+
+// İstatistikler
+$plannedCount = fetchOne("SELECT COUNT(*) as count FROM callbacks WHERE status = 'scheduled'")['count'] ?? 0;
+$previousCount = fetchOne("SELECT COUNT(*) as count FROM callbacks WHERE status IN ('completed', 'failed')")['count'] ?? 0;
+$negativeCount = fetchOne("SELECT COUNT(*) as count FROM callbacks WHERE status = 'failed'")['count'] ?? 0;
+
 include 'includes/header.php';
 ?>
 
@@ -147,15 +169,15 @@ include 'includes/header.php';
         <div class="list-filters">
             <button class="filter-btn active" data-filter="planned" onclick="filterCallbacks('planned')">
                 <i class="far fa-clock"></i>
-                Planlanan <span class="filter-count">25</span>
+                Planlanan <span class="filter-count"><?php echo $plannedCount; ?></span>
             </button>
             <button class="filter-btn" data-filter="previous" onclick="filterCallbacks('previous')">
                 <i class="fas fa-history"></i>
-                Önceki <span class="filter-count">48</span>
+                Önceki <span class="filter-count"><?php echo $previousCount; ?></span>
             </button>
             <button class="filter-btn" data-filter="negative" onclick="filterCallbacks('negative')">
                 <i class="fas fa-ban"></i>
-                Olumsuzlar <span class="filter-count">12</span>
+                Olumsuzlar <span class="filter-count"><?php echo $negativeCount; ?></span>
             </button>
         </div>
     </div>
@@ -178,27 +200,50 @@ include 'includes/header.php';
                 </tr>
             </thead>
             <tbody id="callbackTableBody">
-                <!-- Örnek Satırlar -->
-                <tr class="callback-row priority-high" data-callback-id="1" data-status="planned">
-                    <td>14.11.2025 16:30</td>
-                    <td>Ahmet Yılmaz</td>
-                    <td>0532 123 4567</td>
-                    <td><i class="fab fa-whatsapp" style="color: #25d366;"></i> WhatsApp</td>
-                    <td><span class="status-badge waiting">Bekleniyor</span></td>
-                    <td><span class="purchase-badge no">Almadı</span></td>
-                    <td>WhatsApp Satın Almadı</td>
-                    <td><span class="priority-badge high">Yüksek</span></td>
-                    <td><span class="ai-score high">85%</span></td>
-                    <td>1/3</td>
-                    <td>
-                        <button class="btn-icon info" onclick="viewCallbackDetail(1)">
-                            <i class="fas fa-eye"></i>
-                        </button>
-                        <button class="btn-icon delete" onclick="cancelCallback(1)">
-                            <i class="fas fa-ban"></i>
-                        </button>
+                <?php if (empty($callbacks)): ?>
+                <tr>
+                    <td colspan="11" style="text-align: center; padding: 2rem; color: #8b9cbc;">
+                        Henüz geri arama kaydı bulunmuyor
                     </td>
                 </tr>
+                <?php else: ?>
+                    <?php foreach ($callbacks as $cb):
+                        $fullName = ($cb['name'] && $cb['surname']) ? $cb['name'] . ' ' . $cb['surname'] : 'Bilinmiyor';
+                        $statusClass = ['scheduled' => 'waiting', 'completed' => 'success', 'failed' => 'failed'][$cb['status']] ?? 'waiting';
+                        $statusText = ['scheduled' => 'Bekleniyor', 'completed' => 'Tamamlandı', 'failed' => 'Başarısız'][$cb['status']] ?? 'Bilinmiyor';
+                        $priority = $cb['priority'] ?? 'medium';
+                        $dataStatus = in_array($cb['status'], ['completed', 'failed']) ? 'previous' : 'planned';
+                    ?>
+                    <tr class="callback-row priority-<?php echo $priority; ?>" data-callback-id="<?php echo $cb['id']; ?>" data-status="<?php echo $dataStatus; ?>">
+                        <td><?php echo date('d.m.Y H:i', strtotime($cb['scheduled_time'])); ?></td>
+                        <td><?php echo htmlspecialchars($fullName); ?></td>
+                        <td><?php echo htmlspecialchars($cb['phone'] ?? 'Bilinmiyor'); ?></td>
+                        <td>
+                            <?php if ($cb['source'] === 'whatsapp'): ?>
+                                <i class="fab fa-whatsapp" style="color: #25d366;"></i> WhatsApp
+                            <?php elseif ($cb['source'] === 'phone'): ?>
+                                <i class="fas fa-phone" style="color: #3b82f6;"></i> Telefon
+                            <?php else: ?>
+                                <i class="fas fa-globe" style="color: #8b9cbc;"></i> Web
+                            <?php endif; ?>
+                        </td>
+                        <td><span class="status-badge <?php echo $statusClass; ?>"><?php echo $statusText; ?></span></td>
+                        <td><span class="purchase-badge no">-</span></td>
+                        <td><?php echo htmlspecialchars($cb['rule_name'] ?? '-'); ?></td>
+                        <td><span class="priority-badge <?php echo $priority; ?>"><?php echo ucfirst($priority); ?></span></td>
+                        <td><span class="ai-score medium">-</span></td>
+                        <td><?php echo ($cb['attempts'] ?? 0); ?>/<?php echo ($cb['max_attempts'] ?? 3); ?></td>
+                        <td>
+                            <button class="btn-icon info" onclick="viewCallbackDetail(<?php echo $cb['id']; ?>)">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                            <button class="btn-icon delete" onclick="cancelCallback(<?php echo $cb['id']; ?>)">
+                                <i class="fas fa-ban"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>
