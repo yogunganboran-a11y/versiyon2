@@ -289,7 +289,7 @@ try {
             $note = clean($_POST['note'] ?? '');
             $adminId = $_SESSION['admin_id'];
 
-            insert("INSERT INTO support_notes (request_id, admin_id, note, created_at) VALUES (?, ?, ?, NOW())",
+            insert("INSERT INTO support_notes (ticket_id, admin_id, note, created_at) VALUES (?, ?, ?, NOW())",
                 [$requestId, $adminId, $note]);
 
             echo json_encode(['success' => true, 'message' => 'Not eklendi']);
@@ -351,13 +351,13 @@ try {
             $ip = clean($_POST['ip'] ?? '');
             $reason = clean($_POST['reason'] ?? '');
 
-            insert("INSERT INTO ip_blocklist (ip_address, reason, created_at) VALUES (?, ?, NOW())", [$ip, $reason]);
+            insert("INSERT INTO ip_blacklist (ip_address, reason, created_at) VALUES (?, ?, NOW())", [$ip, $reason]);
             echo json_encode(['success' => true, 'message' => 'IP engellendi']);
             break;
 
         case 'delete_ip_blocklist':
             $id = intval($_POST['id'] ?? 0);
-            query("DELETE FROM ip_blocklist WHERE id = ?", [$id]);
+            query("DELETE FROM ip_blacklist WHERE id = ?", [$id]);
             echo json_encode(['success' => true, 'message' => 'Engel kaldırıldı']);
             break;
 
