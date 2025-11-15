@@ -18,6 +18,38 @@ $inProgressCourses = fetchAll("SELECT uc.*, c.title, c.duration_hours
     ORDER BY uc.enrollment_date DESC
     LIMIT 5", [$userId]);
 
+// Son bildirimleri çek
+$recentNotifications = fetchAll("SELECT id, message, status, created_at
+    FROM sms_history
+    WHERE phone = (SELECT phone FROM users WHERE id = ?)
+    ORDER BY created_at DESC
+    LIMIT 3", [$userId]);
+
+// Bildirim tipini belirle
+function getNotificationTypeIndex($message) {
+    $lowerMsg = mb_strtolower($message, 'UTF-8');
+    if (strpos($lowerMsg, 'başarı') !== false || strpos($lowerMsg, 'tamamland') !== false || strpos($lowerMsg, 'başarıyla') !== false) {
+        return ['icon' => 'success', 'fa' => 'fa-check-circle', 'title' => 'İşlem Başarılı'];
+    } elseif (strpos($lowerMsg, 'video') !== false || strpos($lowerMsg, 'yeni') !== false) {
+        return ['icon' => 'info', 'fa' => 'fa-video', 'title' => 'Yeni İçerik'];
+    } elseif (strpos($lowerMsg, 'sertifika') !== false || strpos($lowerMsg, 'hazır') !== false) {
+        return ['icon' => 'warning', 'fa' => 'fa-file-alt', 'title' => 'Sertifika Hazır'];
+    }
+    return ['icon' => 'info', 'fa' => 'fa-info-circle', 'title' => 'Bildirim'];
+}
+
+function timeAgoIndex($datetime) {
+    $now = new DateTime();
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+    if ($diff->d == 0 && $diff->h <= 23) {
+        if ($diff->h == 0) return $diff->i . ' dakika önce';
+        return $diff->h . ' saat önce';
+    }
+    if ($diff->d == 1) return '1 gün önce';
+    return $diff->d . ' gün önce';
+}
+
 include 'includes/header.php';
 ?>
 
@@ -80,136 +112,84 @@ include 'includes/header.php';
     </div>
     
     <div class="education-grid">
-        <!-- Eğitim 1 -->
-        <div class="education-card">
-            <div class="education-header">
-                <div class="education-icon">
-                    <i class="fas fa-ship"></i>
-                </div>
-                <div class="education-badge ongoing">
-                    <i class="fas fa-circle"></i> Devam Ediyor
-                </div>
+        <?php if (empty($inProgressCourses)): ?>
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: #8b9cbc;">
+                <i class="fas fa-graduation-cap" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
+                <p>Henüz devam eden eğitiminiz bulunmuyor</p>
             </div>
-            
-            <h3 class="education-title">Temel Denizcilik</h3>
-            
-            <div class="progress-section">
-                <div class="progress-info">
-                    <span>İlerleme</span>
-                    <span class="progress-percentage">60%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 60%"></div>
-                </div>
-            </div>
-            
-            <div class="education-status-list">
-                <a href="egitim-video.php?id=1" class="status-item completed" style="text-decoration: none; color: inherit; cursor: pointer;">
-                    <div class="status-icon">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <div class="status-text">
-                        <span class="status-label">Video</span>
-                        <span class="status-value">İzlendi</span>
-                    </div>
-                    <i class="fas fa-check-circle status-check"></i>
-                </a>
+        <?php else: ?>
+            <?php foreach ($inProgressCourses as $course):
+                $progress = 0;
+                if ($course['video_watched']) $progress += 50;
+                if ($course['test_completed']) $progress += 50;
 
-                <a href="egitim-test.php?id=1" class="status-item pending" style="text-decoration: none; color: inherit; cursor: pointer;">
-                    <div class="status-icon">
-                        <i class="fas fa-clipboard-check"></i>
+                $nextAction = !$course['video_watched'] ?
+                    ['url' => 'egitim-video.php?id=' . $course['course_id'], 'text' => 'Videoyu İzle', 'icon' => 'fa-play'] :
+                    ['url' => 'egitim-test.php?id=' . $course['course_id'], 'text' => 'Teste Geç', 'icon' => 'fa-arrow-right'];
+            ?>
+            <div class="education-card">
+                <div class="education-header">
+                    <div class="education-icon">
+                        <i class="fas fa-graduation-cap"></i>
                     </div>
-                    <div class="status-text">
-                        <span class="status-label">Test</span>
-                        <span class="status-value">Yapılmadı</span>
-                        <span class="status-info">Testi çözmek için tıklayın</span>
+                    <div class="education-badge ongoing">
+                        <i class="fas fa-circle"></i> Devam Ediyor
                     </div>
-                    <i class="fas fa-times-circle status-check"></i>
-                </a>
+                </div>
 
-                <div class="status-item waiting" style="opacity: 0.6; cursor: not-allowed;">
-                    <div class="status-icon">
-                        <i class="fas fa-file-alt"></i>
+                <h3 class="education-title"><?php echo htmlspecialchars($course['title']); ?></h3>
+
+                <div class="progress-section">
+                    <div class="progress-info">
+                        <span>İlerleme</span>
+                        <span class="progress-percentage"><?php echo $progress; ?>%</span>
                     </div>
-                    <div class="status-text">
-                        <span class="status-label">Sertifika</span>
-                        <span class="status-value">Beklemede</span>
-                        <span class="status-info">Test tamamlanınca hazır olacak</span>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
                     </div>
-                    <i class="fas fa-clock status-check"></i>
                 </div>
+
+                <div class="education-status-list">
+                    <div class="status-item <?php echo $course['video_watched'] ? 'completed' : 'pending'; ?>">
+                        <div class="status-icon">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <div class="status-text">
+                            <span class="status-label">Video</span>
+                            <span class="status-value"><?php echo $course['video_watched'] ? 'İzlendi' : 'Bekliyor'; ?></span>
+                        </div>
+                        <i class="fas <?php echo $course['video_watched'] ? 'fa-check-circle' : 'fa-clock'; ?> status-check"></i>
+                    </div>
+
+                    <div class="status-item <?php echo $course['test_completed'] ? 'completed' : ($course['video_watched'] ? 'pending' : 'locked'); ?>">
+                        <div class="status-icon">
+                            <i class="fas fa-clipboard-check"></i>
+                        </div>
+                        <div class="status-text">
+                            <span class="status-label">Test</span>
+                            <span class="status-value"><?php echo $course['test_completed'] ? 'Tamamlandı' : ($course['video_watched'] ? 'Bekliyor' : 'Kilitli'); ?></span>
+                        </div>
+                        <i class="fas <?php echo $course['test_completed'] ? 'fa-check-circle' : ($course['video_watched'] ? 'fa-clock' : 'fa-lock'); ?> status-check"></i>
+                    </div>
+
+                    <div class="status-item <?php echo $course['test_completed'] ? 'pending' : 'locked'; ?>">
+                        <div class="status-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="status-text">
+                            <span class="status-label">Sertifika</span>
+                            <span class="status-value"><?php echo $course['test_completed'] ? 'Beklemede' : 'Kilitli'; ?></span>
+                        </div>
+                        <i class="fas fa-clock status-check"></i>
+                    </div>
+                </div>
+
+                <a href="<?php echo $nextAction['url']; ?>" class="btn-education">
+                    <i class="fas <?php echo $nextAction['icon']; ?>"></i> <?php echo $nextAction['text']; ?>
+                </a>
             </div>
-            
-            <a href="egitim-detay.php?id=1" class="btn-education">
-                <i class="fas fa-arrow-right"></i> Teste Geç
-            </a>
-        </div>
-        
-        <!-- Eğitim 2 -->
-        <div class="education-card">
-            <div class="education-header">
-                <div class="education-icon">
-                    <i class="fas fa-shield-alt"></i>
-                </div>
-                <div class="education-badge ongoing">
-                    <i class="fas fa-circle"></i> Devam Ediyor
-                </div>
-            </div>
-            
-            <h3 class="education-title">Güvenlik Eğitimi</h3>
-            
-            <div class="progress-section">
-                <div class="progress-info">
-                    <span>İlerleme</span>
-                    <span class="progress-percentage">30%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 30%"></div>
-                </div>
-            </div>
-            
-            <div class="education-status-list">
-                <div class="status-item in-progress">
-                    <div class="status-icon">
-                        <i class="fas fa-video"></i>
-                    </div>
-                    <div class="status-text">
-                        <span class="status-label">Video</span>
-                        <span class="status-value">%30 İzlendi</span>
-                        <span class="status-info">Videoyu izlemeye devam edin</span>
-                    </div>
-                    <i class="fas fa-spinner fa-pulse status-check"></i>
-                </div>
-                
-                <div class="status-item locked">
-                    <div class="status-icon">
-                        <i class="fas fa-clipboard-check"></i>
-                    </div>
-                    <div class="status-text">
-                        <span class="status-label">Test</span>
-                        <span class="status-value">Kilitli</span>
-                        <span class="status-info">Önce videoyu tamamlayın</span>
-                    </div>
-                    <i class="fas fa-lock status-check"></i>
-                </div>
-                
-                <div class="status-item locked">
-                    <div class="status-icon">
-                        <i class="fas fa-file-alt"></i>
-                    </div>
-                    <div class="status-text">
-                        <span class="status-label">Sertifika</span>
-                        <span class="status-value">Kilitli</span>
-                        <span class="status-info">Testi tamamlayın</span>
-                    </div>
-                    <i class="fas fa-lock status-check"></i>
-                </div>
-            </div>
-            
-            <a href="egitim-detay.php?id=2" class="btn-education">
-                <i class="fas fa-play"></i> Videoyu Devam Ettir
-            </a>
-        </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </div>
 
@@ -224,44 +204,29 @@ include 'includes/header.php';
     </div>
     
     <div class="notifications-container">
-        <div class="notification-card">
-            <div class="notification-icon-wrapper success">
-                <i class="fas fa-check-circle"></i>
+        <?php if (empty($recentNotifications)): ?>
+            <div style="text-align: center; padding: 2rem; color: #8b9cbc;">
+                <i class="fas fa-bell-slash" style="font-size: 2rem; margin-bottom: 0.5rem; display: block;"></i>
+                <p>Henüz bildiriminiz bulunmuyor</p>
             </div>
-            <div class="notification-body">
-                <h4>Testiniz başarıyla tamamlandı</h4>
-                <p>Temel Denizcilik testinde 85 puan aldınız.</p>
-                <span class="notification-time">
-                    <i class="fas fa-clock"></i> 2 saat önce
-                </span>
+        <?php else: ?>
+            <?php foreach ($recentNotifications as $notif):
+                $notifType = getNotificationTypeIndex($notif['message']);
+            ?>
+            <div class="notification-card">
+                <div class="notification-icon-wrapper <?php echo $notifType['icon']; ?>">
+                    <i class="fas <?php echo $notifType['fa']; ?>"></i>
+                </div>
+                <div class="notification-body">
+                    <h4><?php echo htmlspecialchars($notifType['title']); ?></h4>
+                    <p><?php echo htmlspecialchars($notif['message']); ?></p>
+                    <span class="notification-time">
+                        <i class="fas fa-clock"></i> <?php echo timeAgoIndex($notif['created_at']); ?>
+                    </span>
+                </div>
             </div>
-        </div>
-        
-        <div class="notification-card">
-            <div class="notification-icon-wrapper info">
-                <i class="fas fa-video"></i>
-            </div>
-            <div class="notification-body">
-                <h4>Yeni video eklendi</h4>
-                <p>Güvenlik Eğitimi için yeni içerik yayınlandı.</p>
-                <span class="notification-time">
-                    <i class="fas fa-clock"></i> 1 gün önce
-                </span>
-            </div>
-        </div>
-        
-        <div class="notification-card">
-            <div class="notification-icon-wrapper warning">
-                <i class="fas fa-file-alt"></i>
-            </div>
-            <div class="notification-body">
-                <h4>Sertifikanız hazır</h4>
-                <p>Temel Denizcilik sertifikanızı indirebilirsiniz.</p>
-                <span class="notification-time">
-                    <i class="fas fa-clock"></i> 2 gün önce
-                </span>
-            </div>
-        </div>
+            <?php endforeach; ?>
+        <?php endif; ?>
     </div>
 </div>
 

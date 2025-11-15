@@ -314,6 +314,27 @@ $recentSales = fetchAll("SELECT p.*, u.name, u.surname, u.tckn, c.title as cours
     </div>
     
     <!-- Firma Satışları -->
+    <?php
+    $companySales = fetchAll("SELECT
+        p.company_name,
+        c.title as course_title,
+        COUNT(*) as student_count,
+        SUM(p.amount) as total_amount
+        FROM payments p
+        LEFT JOIN courses c ON p.course_id = c.id
+        WHERE p.payment_method = 'company' AND p.status = 'completed'
+        AND DATE(p.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY p.company_name, p.course_id
+        ORDER BY total_amount DESC");
+
+    $companyTotal = fetchOne("SELECT
+        COUNT(*) as count,
+        SUM(amount) as total
+        FROM payments
+        WHERE payment_method = 'company' AND status = 'completed'
+        AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")
+        ?? ['count' => 0, 'total' => 0];
+    ?>
     <div style="background: rgba(20, 184, 166, 0.1); border-left: 4px solid #14b8a6; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
         <div style="margin-bottom: 1rem;">
             <h3 style="font-size: 1.1rem; font-weight: 600; color: #14b8a6; margin-bottom: 0.5rem;">
@@ -321,49 +342,35 @@ $recentSales = fetchAll("SELECT p.*, u.name, u.surname, u.tckn, c.title as cours
             </h3>
             <p style="font-size: 0.9rem; color: var(--text-secondary);">Toplu eğitim alımları</p>
         </div>
-        
+
         <!-- Firma Listesi -->
         <div style="display: grid; gap: 0.75rem;">
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">ABC Lojistik Ltd. Şti.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">15 kişi - İSG Eğitimi</div>
+            <?php if (empty($companySales)): ?>
+                <div style="text-align: center; padding: 1rem; color: var(--text-secondary);">
+                    Henüz firma satışı bulunmuyor
                 </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">15 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">6.750 ₺</div>
+            <?php else: ?>
+                <?php foreach ($companySales as $sale): ?>
+                <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;"><?php echo htmlspecialchars($sale['company_name'] ?? 'Firma Adı Yok'); ?></div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);"><?php echo $sale['student_count']; ?> kişi - <?php echo htmlspecialchars($sale['course_title']); ?></div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;"><?php echo $sale['student_count']; ?> Adet</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;"><?php echo number_format($sale['total_amount'], 0, ',', '.'); ?> ₺</div>
+                    </div>
                 </div>
-            </div>
-            
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">XYZ İnşaat A.Ş.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">8 kişi - Forklift + İSG</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">8 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">4.800 ₺</div>
-                </div>
-            </div>
-            
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Mega Depo Tic. Ltd.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">5 kişi - İSG Eğitimi</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">5 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">2.250 ₺</div>
-                </div>
-            </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
-        
+
         <!-- Firma Toplamı -->
         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(20, 184, 166, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div style="font-weight: 600; color: var(--text-primary);">Toplam Firma Satışları</div>
             <div style="text-align: right;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">28 Adet</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #14b8a6;">13.800 ₺</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;"><?php echo $companyTotal['count']; ?> Adet</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #14b8a6;"><?php echo number_format($companyTotal['total'] ?? 0, 0, ',', '.'); ?> ₺</div>
             </div>
         </div>
     </div>
