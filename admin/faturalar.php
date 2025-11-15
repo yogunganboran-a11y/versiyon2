@@ -1,20 +1,27 @@
 <?php
-$page_title = 'Faturalar';
-include 'includes/header.php';
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
 
-// Demo fatura verileri (Gerçek uygulamada veritabanından gelecek)
-$invoices = [];
-for ($i = 1; $i <= 50; $i++) {
-    $invoices[] = [
-        'id' => $i,
-        'date' => date('d.m.Y H:i', strtotime("-$i days")),
-        'name' => 'Kullanıcı',
-        'surname' => 'Test ' . $i,
-        'tckn' => '1234567890' . $i,
-        'phone' => '0532 ' . str_pad($i, 3, '0', STR_PAD_LEFT) . ' 4567',
-        'invoice_url' => '#'
-    ];
-}
+$page_title = 'Faturalar';
+
+// Faturaları veritabanından çek
+$invoices = fetchAll("
+    SELECT
+        i.*,
+        u.name,
+        u.surname,
+        u.tckn,
+        u.phone
+    FROM invoices i
+    LEFT JOIN users u ON i.user_id = u.id
+    ORDER BY i.created_at DESC
+");
+
+// Bu ay ve bugünkü fatura sayısı
+$thisMonthCount = fetchOne("SELECT COUNT(*) as count FROM invoices WHERE MONTH(created_at) = MONTH(CURDATE())")['count'] ?? 0;
+$todayCount = fetchOne("SELECT COUNT(*) as count FROM invoices WHERE DATE(created_at) = CURDATE()")['count'] ?? 0;
+
+include 'includes/header.php';
 ?>
 
 <link rel="stylesheet" href="assets/css/invoices.css">
@@ -38,17 +45,17 @@ for ($i = 1; $i <= 50; $i++) {
         <div class="stat-label">Toplam Fatura</div>
         <div class="stat-value"><?php echo count($invoices); ?></div>
     </div>
-    
+
     <div class="stat-card">
         <i class="fas fa-calendar-alt stat-icon"></i>
         <div class="stat-label">Bu Ay</div>
-        <div class="stat-value"><?php echo min(30, count($invoices)); ?></div>
+        <div class="stat-value"><?php echo $thisMonthCount; ?></div>
     </div>
-    
+
     <div class="stat-card">
         <i class="fas fa-calendar-day stat-icon"></i>
         <div class="stat-label">Bugün</div>
-        <div class="stat-value"><?php echo min(5, count($invoices)); ?></div>
+        <div class="stat-value"><?php echo $todayCount; ?></div>
     </div>
 </div>
 
@@ -81,21 +88,29 @@ for ($i = 1; $i <= 50; $i++) {
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($invoices as $invoice): ?>
+                <?php if (empty($invoices)): ?>
                 <tr>
-                    <td><?php echo $invoice['date']; ?></td>
-                    <td><?php echo $invoice['name']; ?></td>
-                    <td><?php echo $invoice['surname']; ?></td>
-                    <td><?php echo $invoice['tckn']; ?></td>
-                    <td><?php echo $invoice['phone']; ?></td>
-                    <td>
-                        <button class="view-invoice-btn" onclick="viewInvoice('<?php echo $invoice['invoice_url']; ?>')">
-                            <i class="fas fa-file-pdf"></i>
-                            PDF
-                        </button>
+                    <td colspan="6" style="text-align: center; padding: 2rem; color: #8b9cbc;">
+                        Henüz fatura bulunmuyor
                     </td>
                 </tr>
-                <?php endforeach; ?>
+                <?php else: ?>
+                    <?php foreach ($invoices as $invoice): ?>
+                    <tr>
+                        <td><?php echo date('d.m.Y H:i', strtotime($invoice['created_at'])); ?></td>
+                        <td><?php echo htmlspecialchars($invoice['name'] ?? 'Bilinmiyor'); ?></td>
+                        <td><?php echo htmlspecialchars($invoice['surname'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($invoice['tckn'] ?? ''); ?></td>
+                        <td><?php echo htmlspecialchars($invoice['phone'] ?? ''); ?></td>
+                        <td>
+                            <button class="view-invoice-btn" onclick="viewInvoice('<?php echo $invoice['file_path'] ?? '#'; ?>')">
+                                <i class="fas fa-file-pdf"></i>
+                                PDF
+                            </button>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>

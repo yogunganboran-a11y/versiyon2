@@ -1,5 +1,22 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'Destek Talepleri';
+
+// Destek taleplerini çek
+$supportRequests = fetchAll("
+    SELECT
+        sr.*,
+        u.name,
+        u.surname,
+        u.phone,
+        u.tckn
+    FROM support_requests sr
+    LEFT JOIN users u ON sr.user_id = u.id
+    ORDER BY sr.created_at DESC
+");
+
 include 'includes/header.php';
 ?>
 
@@ -101,6 +118,10 @@ include 'includes/header.php';
     </div>
 </div>
 
+<script>
+// PHP'den gelen destek taleplerini JavaScript'e aktar
+const phpSupportRequests = <?php echo json_encode($supportRequests); ?>;
+</script>
 <script src="assets/js/support.js"></script>
 
 <?php include 'includes/footer.php'; ?>

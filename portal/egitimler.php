@@ -4,6 +4,25 @@ require_once 'includes/auth-check.php';
 $page_title = 'Eğitimlerim';
 $page_css = 'assets/css/egitimler.css';
 
+// Kullanıcının eğitimlerini çek
+$userId = $_SESSION['user_id'];
+$userCourses = fetchAll("
+    SELECT
+        uc.id as enrollment_id,
+        uc.course_id,
+        uc.enrollment_date,
+        uc.video_watched,
+        uc.test_completed,
+        uc.completed_at,
+        uc.status,
+        c.title,
+        c.duration_hours
+    FROM user_courses uc
+    JOIN courses c ON uc.course_id = c.id
+    WHERE uc.user_id = ?
+    ORDER BY uc.enrollment_date DESC
+", [$userId]);
+
 include 'includes/header.php';
 ?>
 
@@ -18,209 +37,97 @@ include 'includes/header.php';
 
 <!-- Education Cards -->
 <div class="education-container">
-    <!-- Tamamlanmış Eğitim -->
-    <div class="education-card completed">
-        <div class="education-header">
-            <div class="education-icon">
-                <i class="fas fa-graduation-cap"></i>
-            </div>
-            <span class="education-status completed">
-                <i class="fas fa-check-circle"></i> Tamamlandı
-            </span>
+    <?php if (empty($userCourses)): ?>
+        <div class="empty-state">
+            <i class="fas fa-graduation-cap" style="font-size: 4rem; color: #8b9cbc; margin-bottom: 1rem;"></i>
+            <h3>Henüz eğitiminiz bulunmuyor</h3>
+            <p>Eğitim satın almak için lütfen bizimle iletişime geçin.</p>
         </div>
-        
-        <div class="education-body">
-            <h3>Temel Denizcilik</h3>
-            
-            <div class="education-info">
-                <div class="info-row">
-                    <span class="info-label">Kayıt Tarihi:</span>
-                    <span class="info-value">01.10.2024</span>
+    <?php else: ?>
+        <?php foreach ($userCourses as $course):
+            // İlerleme hesaplama
+            $progress = 0;
+            if ($course['video_watched']) $progress += 50;
+            if ($course['test_completed']) $progress += 50;
+
+            // Durum belirleme
+            if ($course['completed_at']) {
+                $statusClass = 'completed';
+                $statusText = '<i class="fas fa-check-circle"></i> Tamamlandı';
+            } elseif ($course['video_watched']) {
+                $statusClass = 'in-progress';
+                $statusText = '<i class="fas fa-spinner fa-pulse"></i> Devam Ediyor';
+            } else {
+                $statusClass = 'not-started';
+                $statusText = '<i class="fas fa-clock"></i> Başlanmadı';
+            }
+        ?>
+        <div class="education-card <?php echo $statusClass; ?>">
+            <div class="education-header">
+                <div class="education-icon">
+                    <i class="fas fa-graduation-cap"></i>
                 </div>
-                <div class="info-row">
-                    <span class="info-label">Tamamlanma:</span>
-                    <span class="info-value">05.11.2024</span>
+                <span class="education-status <?php echo $statusClass; ?>">
+                    <?php echo $statusText; ?>
+                </span>
+            </div>
+
+            <div class="education-body">
+                <h3><?php echo htmlspecialchars($course['title']); ?></h3>
+
+                <div class="education-info">
+                    <div class="info-row">
+                        <span class="info-label">Kayıt Tarihi:</span>
+                        <span class="info-value"><?php echo date('d.m.Y', strtotime($course['enrollment_date'])); ?></span>
+                    </div>
+                    <?php if ($course['completed_at']): ?>
+                    <div class="info-row">
+                        <span class="info-label">Tamamlanma:</span>
+                        <span class="info-value"><?php echo date('d.m.Y', strtotime($course['completed_at'])); ?></span>
+                    </div>
+                    <?php endif; ?>
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-header">
+                        <span>İlerleme</span>
+                        <span class="progress-percent"><?php echo $progress; ?>%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: <?php echo $progress; ?>%"></div>
+                    </div>
+                </div>
+
+                <div class="education-steps">
+                    <div class="step <?php echo $course['video_watched'] ? 'completed' : ($progress > 0 ? 'active' : 'pending'); ?>">
+                        <i class="fas fa-video"></i>
+                        <span><?php echo $course['video_watched'] ? 'Video İzlendi' : 'Video Bekleniyor'; ?></span>
+                    </div>
+                    <div class="step <?php echo $course['test_completed'] ? 'completed' : ($course['video_watched'] ? 'active' : 'pending'); ?>">
+                        <i class="fas fa-clipboard-check"></i>
+                        <span><?php echo $course['test_completed'] ? 'Test Tamamlandı' : 'Test Bekliyor'; ?></span>
+                    </div>
                 </div>
             </div>
-            
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span>İlerleme</span>
-                    <span class="progress-percent">100%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 100%"></div>
-                </div>
-            </div>
-            
-            <div class="education-steps">
-                <div class="step completed">
-                    <i class="fas fa-video"></i>
-                    <span>Video İzlendi</span>
-                </div>
-                <div class="step completed">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span>Test Tamamlandı</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="education-actions">
-            <a href="egitim-video.php?id=1" class="btn-review">
-                <i class="fas fa-redo"></i> Tekrar İzle
-            </a>
-        </div>
-    </div>
-    
-    <!-- Devam Eden Eğitim - Video İzlenmedi -->
-    <div class="education-card in-progress">
-        <div class="education-header">
-            <div class="education-icon">
-                <i class="fas fa-graduation-cap"></i>
-            </div>
-            <span class="education-status in-progress">
-                <i class="fas fa-spinner fa-pulse"></i> Devam Ediyor
-            </span>
-        </div>
-        
-        <div class="education-body">
-            <h3>Güvenlik Eğitimi</h3>
-            
-            <div class="education-info">
-                <div class="info-row">
-                    <span class="info-label">Kayıt Tarihi:</span>
-                    <span class="info-value">15.10.2024</span>
-                </div>
-            </div>
-            
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span>İlerleme</span>
-                    <span class="progress-percent">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 0%"></div>
-                </div>
-            </div>
-            
-            <div class="education-steps">
-                <div class="step active">
-                    <i class="fas fa-video"></i>
-                    <span>Video Bekleniyor</span>
-                </div>
-                <div class="step pending">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span>Test Bekliyor</span>
-                </div>
+
+            <div class="education-actions">
+                <?php if ($course['completed_at']): ?>
+                    <a href="egitim-video.php?id=<?php echo $course['course_id']; ?>" class="btn-review">
+                        <i class="fas fa-redo"></i> Tekrar İzle
+                    </a>
+                <?php elseif ($course['video_watched']): ?>
+                    <a href="egitim-test.php?id=<?php echo $course['course_id']; ?>" class="btn-continue">
+                        <i class="fas fa-clipboard-list"></i> Teste Başla
+                    </a>
+                <?php else: ?>
+                    <a href="egitim-video.php?id=<?php echo $course['course_id']; ?>" class="btn-start">
+                        <i class="fas fa-play"></i> Videoyu İzle
+                    </a>
+                <?php endif; ?>
             </div>
         </div>
-        
-        <div class="education-actions">
-            <a href="egitim-video.php?id=2" class="btn-continue">
-                <i class="fas fa-play"></i> Videoyu İzle
-            </a>
-        </div>
-    </div>
-    
-    <!-- Devam Eden Eğitim - Video İzlendi, Test Bekleniyor -->
-    <div class="education-card in-progress">
-        <div class="education-header">
-            <div class="education-icon">
-                <i class="fas fa-graduation-cap"></i>
-            </div>
-            <span class="education-status in-progress">
-                <i class="fas fa-spinner fa-pulse"></i> Devam Ediyor
-            </span>
-        </div>
-        
-        <div class="education-body">
-            <h3>İlk Yardım</h3>
-            
-            <div class="education-info">
-                <div class="info-row">
-                    <span class="info-label">Kayıt Tarihi:</span>
-                    <span class="info-value">20.09.2024</span>
-                </div>
-            </div>
-            
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span>İlerleme</span>
-                    <span class="progress-percent">50%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 50%"></div>
-                </div>
-            </div>
-            
-            <div class="education-steps">
-                <div class="step completed">
-                    <i class="fas fa-video"></i>
-                    <span>Video İzlendi</span>
-                </div>
-                <div class="step active">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span>Test Bekleniyor</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="education-actions">
-            <a href="egitim-test.php?id=3" class="btn-continue">
-                <i class="fas fa-clipboard-list"></i> Teste Başla
-            </a>
-        </div>
-    </div>
-    
-    <!-- Başlangıç Aşamasında -->
-    <div class="education-card not-started">
-        <div class="education-header">
-            <div class="education-icon">
-                <i class="fas fa-graduation-cap"></i>
-            </div>
-            <span class="education-status not-started">
-                <i class="fas fa-clock"></i> Başlanmadı
-            </span>
-        </div>
-        
-        <div class="education-body">
-            <h3>Yangınla Mücadele</h3>
-            
-            <div class="education-info">
-                <div class="info-row">
-                    <span class="info-label">Kayıt Tarihi:</span>
-                    <span class="info-value">05.09.2024</span>
-                </div>
-            </div>
-            
-            <div class="progress-section">
-                <div class="progress-header">
-                    <span>İlerleme</span>
-                    <span class="progress-percent">0%</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" style="width: 0%"></div>
-                </div>
-            </div>
-            
-            <div class="education-steps">
-                <div class="step pending">
-                    <i class="fas fa-video"></i>
-                    <span>Video Bekliyor</span>
-                </div>
-                <div class="step pending">
-                    <i class="fas fa-clipboard-check"></i>
-                    <span>Test Bekliyor</span>
-                </div>
-            </div>
-        </div>
-        
-        <div class="education-actions">
-            <a href="egitim-video.php?id=4" class="btn-start">
-                <i class="fas fa-play-circle"></i> Eğitime Başla
-            </a>
-        </div>
-    </div>
+        <?php endforeach; ?>
+    <?php endif; ?>
 </div>
 
 <!-- Info Box -->

@@ -12,10 +12,10 @@ let selectedStatus = null;
 
 // Sayfa yüklendiğinde
 document.addEventListener('DOMContentLoaded', function() {
-    loadDemoData();
+    loadDataFromPHP();
     loadSupportRequests();
     updateNotificationBadges();
-    
+
     // Yeni talep kontrolü (30 saniyede bir)
     setInterval(checkNewRequests, 30000);
 });
@@ -418,7 +418,84 @@ document.addEventListener('click', function(e) {
     }
 });
 
-// Demo data yükle
+// PHP'den data yükle
+function loadDataFromPHP() {
+    if (typeof phpSupportRequests === 'undefined') {
+        console.log('PHP data yok, demo data kullanılıyor');
+        loadDemoData();
+        return;
+    }
+
+    // Kategorilere göre ayır
+    supportRequests.toplu = [];
+    supportRequests.havale = [];
+    supportRequests.iptal = [];
+    supportRequests.teknik = [];
+    supportRequests.iletisim = [];
+
+    phpSupportRequests.forEach(req => {
+        const formattedReq = {
+            id: req.id,
+            date: new Date(req.created_at).toLocaleString('tr-TR'),
+            phone: req.phone || 'Bilinmiyor',
+            source: req.source || 'web',
+            fullName: (req.name && req.surname) ? `${req.name} ${req.surname}` : 'İsimsiz',
+            firstName: req.name || '',
+            lastName: req.surname || '',
+            tckn: req.tckn || '',
+            status: getStatusText(req.status),
+            statusClass: getStatusClass(req.status),
+            isNew: req.status === 'pending',
+            companyName: req.company_name || '-',
+            documentCount: req.document_count || 0,
+            birthDate: req.birth_date ? new Date(req.birth_date).toLocaleDateString('tr-TR') : '-',
+            price: req.amount || 0,
+            dekontUrl: req.receipt_url || '#',
+            documentType: req.document_type || '-',
+            cancelReason: req.cancel_reason || '-',
+            issueDetail: req.issue_description || '-',
+            requestDetail: req.message || req.description || '-',
+            note: req.notes || '',
+            history: []
+        };
+
+        // Kategoriye göre ekle
+        const category = req.category || 'iletisim';
+        if (supportRequests[category]) {
+            supportRequests[category].push(formattedReq);
+        } else {
+            supportRequests.iletisim.push(formattedReq);
+        }
+    });
+}
+
+// Durum metni al
+function getStatusText(status) {
+    const statusMap = {
+        'pending': 'Beklemede',
+        'in_progress': 'İşlemde',
+        'completed': 'Tamamlandı',
+        'cancelled': 'İptal Edildi',
+        'approved': 'Onaylandı',
+        'rejected': 'Reddedildi'
+    };
+    return statusMap[status] || 'Beklemede';
+}
+
+// Durum class'ı al
+function getStatusClass(status) {
+    const classMap = {
+        'pending': 'pending',
+        'in_progress': 'pending',
+        'completed': 'approved',
+        'approved': 'approved',
+        'cancelled': 'rejected',
+        'rejected': 'rejected'
+    };
+    return classMap[status] || 'pending';
+}
+
+// Demo data yükle (yedek)
 function loadDemoData() {
     supportRequests.toplu = [
         { id: 1, date: '12.11.2025 15:30', phone: '0532 123 4567', source: 'whatsapp', fullName: 'Ahmet Yılmaz', companyName: 'ABC Denizcilik', documentCount: 15, status: 'Beklemede', statusClass: 'pending', isNew: true, history: [] },
