@@ -1,5 +1,4 @@
 <?php
-<?php
 $page_title = 'Kullanıcılar';
 include 'includes/header.php';
 

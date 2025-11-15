@@ -36,7 +36,7 @@ $courses = fetchAll("SELECT c.*,
         <div class="education-features">
             <div class="feature">
                 <i class="far fa-clock"></i>
-                <span><?php echo $course['duration']; ?></span>
+                <span><?php echo $course['duration_hours']; ?> Saat</span>
             </div>
             <div class="feature">
                 <i class="fas fa-users"></i>
@@ -46,10 +46,12 @@ $courses = fetchAll("SELECT c.*,
 
         <div class="card-footer">
             <div class="price-section">
-                <?php if($course['old_price']): ?>
-                <span class="old-price"><?php echo $course['old_price']; ?></span>
+                <?php if($course['discounted_price']): ?>
+                <span class="old-price"><?php echo number_format($course['price'], 2); ?>₺</span>
+                <span class="price"><?php echo number_format($course['discounted_price'], 2); ?>₺</span>
+                <?php else: ?>
+                <span class="price"><?php echo number_format($course['price'], 2); ?>₺</span>
                 <?php endif; ?>
-                <span class="price"><?php echo $course['price']; ?></span>
             </div>
 
             <div class="course-actions">

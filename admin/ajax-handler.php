@@ -158,7 +158,7 @@ try {
                 break;
             }
 
-            $id = insert("INSERT INTO courses (title, short_name, duration_hours, price, discount_price, certificate_release_days, certificate_release_time, video_url, created_at)
+            $id = insert("INSERT INTO courses (title, short_title, duration_hours, price, discounted_price, certificate_days, certificate_time, video_url, created_at)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())",
                 [$title, $shortName, $duration, $price, $discountPrice, $certificateDays, $certificateTime, $videoUrl]);
 
@@ -173,7 +173,7 @@ try {
             $price = floatval($_POST['price'] ?? 0);
             $discountPrice = floatval($_POST['discount_price'] ?? 0);
 
-            query("UPDATE courses SET title = ?, short_name = ?, duration_hours = ?, price = ?, discount_price = ? WHERE id = ?",
+            query("UPDATE courses SET title = ?, short_title = ?, duration_hours = ?, price = ?, discounted_price = ? WHERE id = ?",
                 [$title, $shortName, $duration, $price, $discountPrice, $id]);
 
             echo json_encode(['success' => true, 'message' => 'Eğitim güncellendi']);

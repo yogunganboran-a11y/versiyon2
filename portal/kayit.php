@@ -12,7 +12,7 @@ $egitimler = fetchAll("
         c.id,
         c.title as baslik,
         c.price as fiyat,
-        c.discount_price as eski_fiyat,
+        c.discounted_price as eski_fiyat,
         c.duration_hours
     FROM courses c
     WHERE c.id NOT IN (

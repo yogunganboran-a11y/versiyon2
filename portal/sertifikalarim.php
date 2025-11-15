@@ -23,8 +23,8 @@ $pendingCertificates = fetchAll("
     SELECT
         uc.*,
         c.title as course_title,
-        c.certificate_release_days,
-        c.certificate_release_time
+        c.certificate_days,
+        c.certificate_time
     FROM user_courses uc
     JOIN courses c ON uc.course_id = c.id
     LEFT JOIN certificates cert ON cert.user_id = uc.user_id AND cert.course_id = uc.course_id
@@ -100,8 +100,8 @@ include 'includes/header.php';
             // Tahmini hazır olma tarihi hesapla
             $completedDate = new DateTime($pending['completed_at']);
             $releaseDate = clone $completedDate;
-            $releaseDate->modify('+' . ($pending['certificate_release_days'] ?? 7) . ' days');
-            $releaseTime = $pending['certificate_release_time'] ?? '14:00';
+            $releaseDate->modify('+' . ($pending['certificate_days'] ?? 7) . ' days');
+            $releaseTime = $pending['certificate_time'] ?? '14:00';
         ?>
         <!-- İşlemde Sertifika -->
         <div class="certificate-card processing">
