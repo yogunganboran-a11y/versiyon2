@@ -81,7 +81,8 @@ function getSetting($key, $default = '') {
 function updateSetting($key, $value) {
     query("UPDATE settings SET setting_value = ?, updated_at = NOW() WHERE setting_key = ?", [$value, $key]);
     // Cache'i temizle
-    getSettings.cache = null;
+    global $settingsCache;
+    $settingsCache = null;
 }
 
 /**
