@@ -2,53 +2,10 @@
 $page_title = 'Eğitimler';
 include 'includes/header.php';
 
-// Demo eğitim verileri
-$courses = [
-    [
-        'id' => 1,
-        'title' => 'Python ile Web Geliştirme',
-        'duration' => '12 Saat',
-        'thumbnail' => 'https://via.placeholder.com/400x250/667eea/ffffff?text=Python',
-        'price' => '499 ₺',
-        'old_price' => '799 ₺',
-        'discount' => '%37',
-        'students' => 245,
-        'rating' => 4.8
-    ],
-    [
-        'id' => 2,
-        'title' => 'JavaScript Modern Programlama',
-        'duration' => '18 Saat',
-        'thumbnail' => 'https://via.placeholder.com/400x250/764ba2/ffffff?text=JavaScript',
-        'price' => '599 ₺',
-        'old_price' => '999 ₺',
-        'discount' => '%40',
-        'students' => 532,
-        'rating' => 4.9
-    ],
-    [
-        'id' => 3,
-        'title' => 'React ile Modern Web Uygulamaları',
-        'duration' => '24 Saat',
-        'thumbnail' => 'https://via.placeholder.com/400x250/f093fb/ffffff?text=React',
-        'price' => '799 ₺',
-        'old_price' => '1299 ₺',
-        'discount' => '%38',
-        'students' => 189,
-        'rating' => 4.7
-    ],
-    [
-        'id' => 4,
-        'title' => 'Node.js Backend Geliştirme',
-        'duration' => '16 Saat',
-        'thumbnail' => 'https://via.placeholder.com/400x250/4facfe/ffffff?text=Node.js',
-        'price' => '699 ₺',
-        'old_price' => '1099 ₺',
-        'discount' => '%36',
-        'students' => 312,
-        'rating' => 4.6
-    ]
-];
+// Veritabanından eğitimleri çek
+$courses = fetchAll("SELECT c.*, 
+    (SELECT COUNT(*) FROM user_courses WHERE course_id = c.id) as students 
+    FROM courses c ORDER BY created_at DESC");
 ?>
 
 <link rel="stylesheet" href="assets/css/egitimler.css">

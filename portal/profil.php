@@ -4,16 +4,30 @@ require_once 'includes/auth-check.php';
 $page_title = 'Profilim';
 $page_css = 'assets/css/profil.css';
 
+// Kullanıcının eğitimlerini çek
+$userId = $user['id'];
+$userCourses = fetchAll("SELECT uc.*, c.title, c.duration_hours, uc.completed_at
+    FROM user_courses uc
+    JOIN courses c ON uc.course_id = c.id
+    WHERE uc.user_id = ?
+    ORDER BY uc.enrollment_date DESC", [$userId]);
+
+// Kullanıcının sertifikalarını çek
+$userCertificates = fetchAll("SELECT cert.*, c.title as course_title
+    FROM certificates cert
+    JOIN courses c ON cert.course_id = c.id
+    WHERE cert.user_id = ?
+    ORDER BY cert.issue_date DESC", [$userId]);
+
+// Kullanıcının ödemelerini çek
+$userPayments = fetchAll("SELECT p.*, c.title as course_title
+    FROM payments p
+    JOIN courses c ON p.course_id = c.id
+    WHERE p.user_id = ? AND p.status = 'completed'
+    ORDER BY p.created_at DESC", [$userId]);
+
 include 'includes/header.php';
 ?>
-
-<!-- Profile Header -->
-<div class="profile-header">
-    <div class="profile-avatar-large">
-        <?php if ($user['avatar']): ?>
-            <img src="<?php echo $user['avatar']; ?>" alt="Profil">
-        <?php else: ?>
-            <i class="fas fa-user"></i>
         <?php endif; ?>
     </div>
     <div class="profile-info">
