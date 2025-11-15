@@ -1,6 +1,24 @@
 <?php
 $page_title = 'Satışlar';
 include 'includes/header.php';
+
+// Veritabanından istatistikleri çek
+$stats = fetchOne("SELECT
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'online' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as online_count,
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'transfer' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as transfer_count,
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'company' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as company_count,
+    (SELECT COUNT(*) FROM payments WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as total_count,
+    (SELECT SUM(amount) FROM payments WHERE status = 'completed' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as total_revenue
+") ?? ['online_count' => 0, 'transfer_count' => 0, 'company_count' => 0, 'total_count' => 0, 'total_revenue' => 0];
+
+// Son satışları çek
+$recentSales = fetchAll("SELECT p.*, u.name, u.surname, u.tckn, c.title as course_title
+    FROM payments p
+    LEFT JOIN users u ON p.user_id = u.id
+    LEFT JOIN courses c ON p.course_id = c.id
+    WHERE p.status = 'completed'
+    ORDER BY p.created_at DESC
+    LIMIT 20");
 ?>
 
 <!-- Page Header -->
@@ -49,8 +67,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Online Kayıtlar</div>
-            <div class="stat-value">156</div>
-            <div class="stat-description">+8% geçen haftaya göre</div>
+            <div class="stat-value"><?php echo $stats['online_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -61,8 +79,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Havale Kayıtları</div>
-            <div class="stat-value">24</div>
-            <div class="stat-description">+12% geçen haftaya göre</div>
+            <div class="stat-value"><?php echo $stats['transfer_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -73,8 +91,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Firma Kayıtları</div>
-            <div class="stat-value">8</div>
-            <div class="stat-description">+3 yeni firma</div>
+            <div class="stat-value"><?php echo $stats['company_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -85,7 +103,7 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Toplam Kayıtlar</div>
-            <div class="stat-value">188</div>
+            <div class="stat-value"><?php echo $stats['total_count']; ?></div>
             <div class="stat-description">Son 7 gün</div>
         </div>
     </div>

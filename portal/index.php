@@ -5,12 +5,25 @@ $page_title = 'Dashboard';
 $page_css = 'assets/css/dashboard.css';
 $page_js = 'assets/js/dashboard.js';
 
+// Kullanıcı istatistiklerini çek
+$userId = $user['id'];
+$courseCount = fetchOne("SELECT COUNT(*) as count FROM user_courses WHERE user_id = ?", [$userId])['count'] ?? 0;
+$certificateCount = fetchOne("SELECT COUNT(*) as count FROM certificates WHERE user_id = ?", [$userId])['count'] ?? 0;
+
+// Devam eden eğitimleri çek
+$inProgressCourses = fetchAll("SELECT uc.*, c.title, c.duration_hours
+    FROM user_courses uc
+    JOIN courses c ON uc.course_id = c.id
+    WHERE uc.user_id = ? AND uc.status = 'active' AND uc.completed_at IS NULL
+    ORDER BY uc.enrollment_date DESC
+    LIMIT 5", [$userId]);
+
 include 'includes/header.php';
 ?>
 
 <!-- Welcome Section -->
 <div class="welcome-section">
-    <h1>Hoş Geldin, <?php echo $user['ad'] . ' ' . $user['soyad']; ?>! 👋</h1>
+    <h1>Hoş Geldin, <?php echo isset($user['name']) ? $user['name'] . ' ' . ($user['surname'] ?? '') : 'Kullanıcı'; ?>! 👋</h1>
     <p>Eğitimlerinize kaldığınız yerden devam edebilirsiniz.</p>
 </div>
 
@@ -24,7 +37,7 @@ include 'includes/header.php';
         <div class="stat-content">
             <h3>Sertifikalarım</h3>
             <a href="sertifikalarim.php" class="stat-link">
-                Görüntüle (3) <i class="fas fa-arrow-right"></i>
+                Görüntüle (<?php echo $certificateCount; ?>) <i class="fas fa-arrow-right"></i>
             </a>
         </div>
     </div>
@@ -37,7 +50,7 @@ include 'includes/header.php';
         <div class="stat-content">
             <h3>Eğitimlerim</h3>
             <a href="egitimler.php" class="stat-link">
-                Görüntüle (5) <i class="fas fa-arrow-right"></i>
+                Görüntüle (<?php echo $courseCount; ?>) <i class="fas fa-arrow-right"></i>
             </a>
         </div>
     </div>
