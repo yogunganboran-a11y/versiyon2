@@ -119,9 +119,9 @@ CREATE TABLE IF NOT EXISTS `test_options` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
--- 7. KAYITLAR VE ÖDEMELER (ENROLLMENTS) TABLOSU
+-- 7. KAYITLAR VE ÖDEMELER (USER_COURSES) TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `enrollments` (
+CREATE TABLE IF NOT EXISTS `user_courses` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `user_id` INT(11) UNSIGNED NOT NULL,
   `course_id` INT(11) UNSIGNED NOT NULL,
@@ -129,46 +129,52 @@ CREATE TABLE IF NOT EXISTS `enrollments` (
   `amount` DECIMAL(10,2) NOT NULL,
   `payment_method` ENUM('online','havale','firma') DEFAULT NULL,
   `payment_token` VARCHAR(255) DEFAULT NULL,
+  `status` ENUM('pending','active','completed','cancelled') DEFAULT 'active',
   `video_watched` TINYINT(1) DEFAULT 0,
   `test_completed` TINYINT(1) DEFAULT 0,
+  `test_score` INT(11) DEFAULT NULL,
   `registration_document` VARCHAR(255) DEFAULT NULL,
   `invoice` VARCHAR(255) DEFAULT NULL,
   `certificate` VARCHAR(255) DEFAULT NULL,
   `certificate_issue_date` DATE DEFAULT NULL,
-  `enrolled_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `enrollment_date` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `completed_at` DATETIME DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_course` (`user_id`,`course_id`),
   KEY `user_id` (`user_id`),
   KEY `course_id` (`course_id`),
-  CONSTRAINT `fk_enrollments_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
-  CONSTRAINT `fk_enrollments_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
+  KEY `status` (`status`),
+  CONSTRAINT `fk_user_courses_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_user_courses_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
 -- 8. DESTEK TALEPLERİ TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `support_tickets` (
+CREATE TABLE IF NOT EXISTS `support_requests` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
   `name` VARCHAR(100) NOT NULL,
   `surname` VARCHAR(100) NOT NULL,
   `tckn` VARCHAR(11) DEFAULT NULL,
   `phone` VARCHAR(20) NOT NULL COMMENT 'Sadece rakam: 05321234567',
   `birth_date` DATE DEFAULT NULL,
-  `category` ENUM('bulk','transfer','cancel','technical','contact','other') DEFAULT 'other',
+  `category` ENUM('iletisim','teknik','havale','iptal','toplu','other') DEFAULT 'other',
   `company_name` VARCHAR(200) DEFAULT NULL,
   `document_count` INT(11) DEFAULT NULL,
   `courses` TEXT DEFAULT NULL,
   `source` VARCHAR(100) DEFAULT NULL,
   `receipt` VARCHAR(255) DEFAULT NULL,
   `message` TEXT DEFAULT NULL,
-  `status` ENUM('open','in_progress','resolved','closed','cancelled') DEFAULT 'open',
+  `status` ENUM('pending','in_progress','completed','closed','cancelled') DEFAULT 'pending',
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
   KEY `status` (`status`),
   KEY `category` (`category`),
-  KEY `phone` (`phone`)
+  KEY `phone` (`phone`),
+  CONSTRAINT `fk_support_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
@@ -184,34 +190,38 @@ CREATE TABLE IF NOT EXISTS `support_notes` (
   PRIMARY KEY (`id`),
   KEY `ticket_id` (`ticket_id`),
   KEY `admin_id` (`admin_id`),
-  CONSTRAINT `fk_notes_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `support_tickets` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_notes_ticket` FOREIGN KEY (`ticket_id`) REFERENCES `support_requests` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_notes_admin` FOREIGN KEY (`admin_id`) REFERENCES `admins` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
 -- 10. GERİ ARAMA LİSTESİ TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `callback_requests` (
+CREATE TABLE IF NOT EXISTS `callbacks` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
   `phone` VARCHAR(20) NOT NULL COMMENT 'Sadece rakam: 05321234567',
   `reason` VARCHAR(255) DEFAULT NULL,
   `source` ENUM('web','phone','whatsapp','meta','other') DEFAULT 'web',
-  `status` ENUM('pending','in_progress','completed','cancelled') DEFAULT 'pending',
+  `status` ENUM('scheduled','pending','in_progress','completed','failed','cancelled') DEFAULT 'scheduled',
   `priority` ENUM('low','medium','high') DEFAULT 'medium',
+  `rule_name` VARCHAR(100) DEFAULT NULL,
   `ai_analyzed` TINYINT(1) DEFAULT 0,
   `ai_score` DECIMAL(5,2) DEFAULT NULL,
-  `attempt_count` INT(11) DEFAULT 0,
+  `attempts` INT(11) DEFAULT 0,
   `max_attempts` INT(11) DEFAULT 3,
-  `scheduled_date` DATETIME NOT NULL,
+  `scheduled_time` DATETIME NOT NULL,
   `called_at` DATETIME DEFAULT NULL,
   `notes` TEXT DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
   KEY `status` (`status`),
-  KEY `scheduled_date` (`scheduled_date`),
-  KEY `priority` (`priority`)
+  KEY `scheduled_time` (`scheduled_time`),
+  KEY `priority` (`priority`),
+  CONSTRAINT `fk_callbacks_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
@@ -242,16 +252,21 @@ INSERT IGNORE INTO `callback_rules` (`name`, `action_time`, `retry_days`, `max_a
 -- ===================================
 CREATE TABLE IF NOT EXISTS `phone_calls` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
   `phone` VARCHAR(20) NOT NULL COMMENT 'Sadece rakam: 05321234567',
-  `type` ENUM('incoming','outgoing','missed') NOT NULL,
+  `direction` ENUM('incoming','outgoing','missed') NOT NULL,
+  `duration` INT(11) DEFAULT 0 COMMENT 'Saniye cinsinden',
+  `status` ENUM('answered','completed','missed','failed') DEFAULT 'answered',
+  `recording_url` VARCHAR(255) DEFAULT NULL,
   `call_start` DATETIME NOT NULL,
   `call_end` DATETIME DEFAULT NULL,
-  `recording` VARCHAR(255) DEFAULT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
   KEY `phone` (`phone`),
-  KEY `type` (`type`),
-  KEY `call_start` (`call_start`)
+  KEY `direction` (`direction`),
+  KEY `call_start` (`call_start`),
+  CONSTRAINT `fk_calls_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
@@ -273,15 +288,23 @@ CREATE TABLE IF NOT EXISTS `phone_transcripts` (
 -- ===================================
 -- 14. WHATSAPP SOHBETLER TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `whatsapp_chat` (
+CREATE TABLE IF NOT EXISTS `whatsapp_conversations` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
   `chat_id` VARCHAR(100) NOT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
+  `phone` VARCHAR(20) DEFAULT NULL,
+  `status` ENUM('active','archived','blocked') DEFAULT 'active',
+  `last_activity` DATETIME DEFAULT NULL,
   `last_message_at` DATETIME DEFAULT NULL,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `bot_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `chat_id` (`chat_id`)
+  UNIQUE KEY `chat_id` (`chat_id`),
+  KEY `user_id` (`user_id`),
+  KEY `status` (`status`),
+  CONSTRAINT `fk_whatsapp_conv_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
@@ -289,30 +312,39 @@ CREATE TABLE IF NOT EXISTS `whatsapp_chat` (
 -- ===================================
 CREATE TABLE IF NOT EXISTS `whatsapp_messages` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `conversation_id` INT(11) UNSIGNED NOT NULL,
   `chat_id` VARCHAR(100) NOT NULL,
   `direction` ENUM('incoming','outgoing') NOT NULL,
-  `body` TEXT DEFAULT NULL,
+  `message` TEXT DEFAULT NULL,
+  `is_read` TINYINT(1) DEFAULT 0,
   `message_at` DATETIME NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `conversation_id` (`conversation_id`),
   KEY `chat_id` (`chat_id`),
   KEY `direction` (`direction`),
-  KEY `message_at` (`message_at`)
+  KEY `message_at` (`message_at`),
+  CONSTRAINT `fk_whatsapp_msg_conv` FOREIGN KEY (`conversation_id`) REFERENCES `whatsapp_conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
 -- 16. META SOHBETLER TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `meta_chat` (
+CREATE TABLE IF NOT EXISTS `meta_conversations` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
   `platform` ENUM('facebook','instagram') NOT NULL,
   `chat_id` VARCHAR(100) NOT NULL,
   `name` VARCHAR(100) DEFAULT NULL,
+  `last_activity` DATETIME DEFAULT NULL,
   `last_message_at` DATETIME DEFAULT NULL,
-  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   `bot_active` TINYINT(1) DEFAULT 1,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
-  UNIQUE KEY `platform_chat` (`platform`, `chat_id`)
+  UNIQUE KEY `platform_chat` (`platform`, `chat_id`),
+  KEY `user_id` (`user_id`),
+  CONSTRAINT `fk_meta_conv_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
@@ -320,23 +352,31 @@ CREATE TABLE IF NOT EXISTS `meta_chat` (
 -- ===================================
 CREATE TABLE IF NOT EXISTS `meta_messages` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED DEFAULT NULL,
+  `conversation_id` INT(11) UNSIGNED DEFAULT NULL,
   `platform` ENUM('facebook','instagram') NOT NULL,
   `chat_id` VARCHAR(100) NOT NULL,
   `direction` ENUM('incoming','outgoing') NOT NULL,
-  `body` TEXT DEFAULT NULL,
+  `message` TEXT DEFAULT NULL,
+  `is_read` TINYINT(1) DEFAULT 0,
+  `last_activity` DATETIME DEFAULT NULL,
   `message_at` DATETIME NOT NULL,
   `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `conversation_id` (`conversation_id`),
   KEY `platform` (`platform`),
   KEY `chat_id` (`chat_id`),
   KEY `direction` (`direction`),
-  KEY `message_at` (`message_at`)
+  KEY `message_at` (`message_at`),
+  CONSTRAINT `fk_meta_msg_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `fk_meta_msg_conv` FOREIGN KEY (`conversation_id`) REFERENCES `meta_conversations` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
 -- 18. IP TAKİP TABLOSU
 -- ===================================
-CREATE TABLE IF NOT EXISTS `ip_tracking` (
+CREATE TABLE IF NOT EXISTS `ip_logs` (
   `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
   `ip_address` VARCHAR(45) NOT NULL,
   `user_id` INT(11) UNSIGNED DEFAULT NULL,
@@ -545,29 +585,116 @@ CREATE TABLE IF NOT EXISTS `sms_history` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ===================================
+-- 24. SERTİFİKALAR TABLOSU
+-- ===================================
+CREATE TABLE IF NOT EXISTS `certificates` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED NOT NULL,
+  `course_id` INT(11) UNSIGNED NOT NULL,
+  `certificate_number` VARCHAR(50) DEFAULT NULL,
+  `file_path` VARCHAR(255) DEFAULT NULL,
+  `issue_date` DATE DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_course_cert` (`user_id`,`course_id`),
+  KEY `user_id` (`user_id`),
+  KEY `course_id` (`course_id`),
+  KEY `certificate_number` (`certificate_number`),
+  CONSTRAINT `fk_cert_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_cert_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===================================
+-- 25. ÖDEMELER TABLOSU
+-- ===================================
+CREATE TABLE IF NOT EXISTS `payments` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED NOT NULL,
+  `course_id` INT(11) UNSIGNED NOT NULL,
+  `amount` DECIMAL(10,2) NOT NULL,
+  `payment_method` ENUM('online','transfer','company','other') DEFAULT 'online',
+  `payment_token` VARCHAR(255) DEFAULT NULL,
+  `company_name` VARCHAR(200) DEFAULT NULL,
+  `status` ENUM('pending','completed','failed','refunded') DEFAULT 'pending',
+  `transaction_id` VARCHAR(100) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `course_id` (`course_id`),
+  KEY `status` (`status`),
+  KEY `payment_method` (`payment_method`),
+  CONSTRAINT `fk_payment_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_payment_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===================================
+-- 26. EĞİTİM TEST SORULARI TABLOSU
+-- ===================================
+CREATE TABLE IF NOT EXISTS `course_test_questions` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `course_id` INT(11) UNSIGNED NOT NULL,
+  `question_text` TEXT NOT NULL,
+  `option_a` VARCHAR(500) DEFAULT NULL,
+  `option_b` VARCHAR(500) DEFAULT NULL,
+  `option_c` VARCHAR(500) DEFAULT NULL,
+  `option_d` VARCHAR(500) DEFAULT NULL,
+  `correct_answer` ENUM('A','B','C','D') NOT NULL,
+  `question_order` INT(11) DEFAULT 0,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `course_id` (`course_id`),
+  KEY `question_order` (`question_order`),
+  CONSTRAINT `fk_course_test_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===================================
+-- 27. FATURALAR TABLOSU
+-- ===================================
+CREATE TABLE IF NOT EXISTS `invoices` (
+  `id` INT(11) UNSIGNED NOT NULL AUTO_INCREMENT,
+  `user_id` INT(11) UNSIGNED NOT NULL,
+  `course_id` INT(11) UNSIGNED NOT NULL,
+  `invoice_number` VARCHAR(50) DEFAULT NULL,
+  `file_path` VARCHAR(255) DEFAULT NULL,
+  `amount` DECIMAL(10,2) DEFAULT NULL,
+  `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `course_id` (`course_id`),
+  KEY `invoice_number` (`invoice_number`),
+  CONSTRAINT `fk_invoice_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `fk_invoice_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ===================================
 -- VERİTABANI OLUŞTURMA TAMAMLANDI
 -- ===================================
--- TOPLAM: 23 TABLO
+-- TOPLAM: 27 TABLO
 -- 1. admins
 -- 2. admin_permissions
 -- 3. users
--- 4. courses (certificate_time TIME olarak güncellendi)
+-- 4. courses
 -- 5. test_questions
 -- 6. test_options
--- 7. enrollments
--- 8. support_tickets
+-- 7. user_courses (eski adı: enrollments)
+-- 8. support_requests (eski adı: support_tickets)
 -- 9. support_notes
--- 10. callback_requests
+-- 10. callbacks (eski adı: callback_requests)
 -- 11. callback_rules
--- 12. phone_calls (YENİ)
--- 13. phone_transcripts (YENİ)
--- 14. whatsapp_chat (YENİ)
--- 15. whatsapp_messages (YENİ)
--- 16. meta_chat (YENİ)
--- 17. meta_messages (YENİ)
--- 18. ip_tracking
+-- 12. phone_calls
+-- 13. phone_transcripts
+-- 14. whatsapp_conversations (eski adı: whatsapp_chat)
+-- 15. whatsapp_messages
+-- 16. meta_conversations (eski adı: meta_chat)
+-- 17. meta_messages
+-- 18. ip_logs (eski adı: ip_tracking)
 -- 19. ip_blacklist
 -- 20. ip_whitelist
 -- 21. settings
 -- 22. ai_instructions
 -- 23. sms_history
+-- 24. certificates (YENİ)
+-- 25. payments (YENİ)
+-- 26. course_test_questions (YENİ)
+-- 27. invoices (YENİ)
