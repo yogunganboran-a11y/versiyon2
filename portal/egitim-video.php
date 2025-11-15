@@ -4,17 +4,40 @@ require_once 'includes/auth-check.php';
 $page_title = 'Eğitim Videosu';
 $page_css = 'assets/css/egitim-video.css';
 
-include 'includes/header.php';
+// Eğitim ID'sini al
+$courseId = intval($_GET['id'] ?? 0);
+$userId = $_SESSION['user_id'];
 
-$egitim_adi = "Temel Denizcilik";
+// Eğitim bilgilerini çek
+$course = fetchOne("
+    SELECT
+        c.*,
+        uc.video_watched,
+        uc.test_completed
+    FROM courses c
+    JOIN user_courses uc ON uc.course_id = c.id
+    WHERE c.id = ? AND uc.user_id = ?
+", [$courseId, $userId]);
+
+if (!$course) {
+    header('Location: egitimler.php');
+    exit;
+}
+
+$egitim_adi = $course['title'];
+$videoUrl = $course['video_url'] ?? '';
+
+include 'includes/header.php';
 ?>
 
 <!-- Video Container -->
 <div class="video-container">
     <div class="video-wrapper" id="videoWrapper">
         <video id="educationVideo" class="video-player" playsinline webkit-playsinline x-webkit-airplay="deny">
-            <source src="video.mp4" type="video/mp4">
-            Tarayıcınız video etiketini desteklemiyor.
+            <?php if ($videoUrl): ?>
+                <source src="<?php echo htmlspecialchars($videoUrl); ?>" type="video/mp4">
+            <?php endif; ?>
+            Tarayıcınız video etiketini desteklemiyor<?php if (!$videoUrl): ?> veya video URL'si tanımlanmamış<?php endif; ?>.
         </video>
         
         <!-- Play Overlay -->

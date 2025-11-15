@@ -1,32 +1,45 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'WhatsApp';
-include 'includes/header.php';
 
-// Demo sohbet verileri - 70 sohbet
-$chats = [];
-$names = ['Ahmet Yılmaz', 'Mehmet Demir', 'Ayşe Kaya', 'Fatma Özdemir', 'Ali Şahin', 'Zeynep Çelik', 'Mustafa Aydın', 'Elif Kara', 'Hasan Yıldız', 'Selin Arslan'];
-$avatars = ['AY', 'MD', 'AK', 'FÖ', 'AŞ', 'ZÇ', 'MA', 'EK', 'HY', 'SA'];
-$messages = ['Merhaba', 'Teşekkürler', 'Ne zaman gelir?', 'Fiyat ne kadar?', 'İptal etmek istiyorum', 'Kargo takip', 'Ürün var mı?', 'İade', 'Bilgi alabilir miyim?', 'Tamam'];
-$times = ['Bugün', 'Dün', '2 gün önce', '3 gün önce', '1 hafta önce'];
+// WhatsApp konuşmalarını veritabanından çek
+$chats = fetchAll("
+    SELECT
+        wc.*,
+        u.name,
+        u.surname,
+        u.phone,
+        (SELECT message FROM whatsapp_messages WHERE conversation_id = wc.id ORDER BY created_at DESC LIMIT 1) as last_message,
+        (SELECT created_at FROM whatsapp_messages WHERE conversation_id = wc.id ORDER BY created_at DESC LIMIT 1) as last_message_time,
+        (SELECT COUNT(*) FROM whatsapp_messages WHERE conversation_id = wc.id AND is_read = 0 AND direction = 'incoming') as unread
+    FROM whatsapp_conversations wc
+    LEFT JOIN users u ON wc.user_id = u.id
+    ORDER BY wc.last_activity DESC
+");
 
-for ($i = 1; $i <= 70; $i++) {
-    $nameIndex = ($i - 1) % 10;
-    $phoneBase = 530 + ($i % 10);
-    $phoneMid = str_pad($i, 3, '0', STR_PAD_LEFT);
-    $phoneEnd = str_pad($i * 10, 4, '0', STR_PAD_LEFT);
-    
-    $chats[] = [
-        'id' => $i,
-        'name' => $names[$nameIndex] . ' ' . $i,
-        'whatsapp_name' => $names[$nameIndex] . ' 📱',
-        'avatar' => $avatars[$nameIndex],
-        'phone' => "+90 {$phoneBase} {$phoneMid} {$phoneEnd}",
-        'last_message' => $messages[($i - 1) % 10],
-        'time' => $times[($i - 1) % 5],
-        'unread' => $i <= 5 ? rand(0, 3) : 0,
-        'online' => $i % 3 === 0
-    ];
+// Avatar oluşturma fonksiyonu
+function getAvatar($name, $surname) {
+    $first = $name ? mb_substr($name, 0, 1, 'UTF-8') : '';
+    $last = $surname ? mb_substr($surname, 0, 1, 'UTF-8') : '';
+    return strtoupper($first . $last);
 }
+
+// Zaman farkını hesapla
+function timeAgo($datetime) {
+    $now = new DateTime();
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+
+    if ($diff->d == 0) return 'Bugün';
+    if ($diff->d == 1) return 'Dün';
+    if ($diff->d < 7) return $diff->d . ' gün önce';
+    if ($diff->d < 30) return floor($diff->d / 7) . ' hafta önce';
+    return $ago->format('d.m.Y');
+}
+
+include 'includes/header.php';
 ?>
 
 <link rel="stylesheet" href="assets/css/whatsapp.css">
@@ -97,26 +110,37 @@ document.body.classList.add('whatsapp-page');
         </div>
         
         <div class="chat-list">
-            <?php foreach ($chats as $chat): ?>
-            <div class="chat-item <?php echo $chat['unread'] > 0 ? 'unread' : ''; ?>" 
-                 data-chat-id="<?php echo $chat['id']; ?>"
-                 data-phone="<?php echo $chat['phone']; ?>"
-                 onclick="selectChat(<?php echo $chat['id']; ?>)">
-                <div class="chat-avatar"><?php echo $chat['avatar']; ?></div>
-                <div class="chat-info">
-                    <div class="chat-header">
-                        <span class="chat-name"><?php echo $chat['phone']; ?></span>
-                        <span class="chat-time"><?php echo $chat['time']; ?></span>
-                    </div>
-                    <div class="chat-preview">
-                        <span class="chat-last-message"><?php echo $chat['last_message']; ?></span>
-                        <?php if ($chat['unread'] > 0): ?>
-                        <span class="chat-unread-badge"><?php echo $chat['unread']; ?></span>
-                        <?php endif; ?>
+            <?php if (empty($chats)): ?>
+                <div style="text-align: center; padding: 2rem; color: #8b9cbc;">
+                    <i class="fab fa-whatsapp" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p style="margin-top: 1rem;">Henüz WhatsApp konuşması yok</p>
+                </div>
+            <?php else: ?>
+                <?php foreach ($chats as $chat):
+                    $fullName = ($chat['name'] && $chat['surname']) ? $chat['name'] . ' ' . $chat['surname'] : $chat['phone'];
+                    $avatar = getAvatar($chat['name'] ?? '', $chat['surname'] ?? '');
+                    $timeText = $chat['last_message_time'] ? timeAgo($chat['last_message_time']) : '';
+                ?>
+                <div class="chat-item <?php echo $chat['unread'] > 0 ? 'unread' : ''; ?>"
+                     data-chat-id="<?php echo $chat['id']; ?>"
+                     data-phone="<?php echo htmlspecialchars($chat['phone']); ?>"
+                     onclick="selectChat(<?php echo $chat['id']; ?>)">
+                    <div class="chat-avatar"><?php echo $avatar ?: '?'; ?></div>
+                    <div class="chat-info">
+                        <div class="chat-header">
+                            <span class="chat-name"><?php echo htmlspecialchars($fullName); ?></span>
+                            <span class="chat-time"><?php echo $timeText; ?></span>
+                        </div>
+                        <div class="chat-preview">
+                            <span class="chat-last-message"><?php echo htmlspecialchars($chat['last_message'] ?? ''); ?></span>
+                            <?php if ($chat['unread'] > 0): ?>
+                            <span class="chat-unread-badge"><?php echo $chat['unread']; ?></span>
+                            <?php endif; ?>
+                        </div>
                     </div>
                 </div>
-            </div>
-            <?php endforeach; ?>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
     </div>
     

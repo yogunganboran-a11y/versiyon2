@@ -4,47 +4,24 @@ require_once 'includes/auth-check.php';
 $page_title = 'Eğitim Satın Al';
 $page_css = 'assets/css/kayit.css';
 
-include 'includes/header.php';
+$userId = $_SESSION['user_id'];
 
-// Satın alınabilir eğitimler (normalde veritabanından gelir)
-$egitimler = [
-    [
-        'id' => 1,
-        'baslik' => 'Temel Denizcilik',
-        'fiyat' => 299.00,
-        'eski_fiyat' => 399.00
-    ],
-    [
-        'id' => 2,
-        'baslik' => 'Güvenlik Eğitimi',
-        'fiyat' => 249.00,
-        'eski_fiyat' => 349.00
-    ],
-    [
-        'id' => 3,
-        'baslik' => 'İlk Yardım',
-        'fiyat' => 349.00,
-        'eski_fiyat' => 449.00
-    ],
-    [
-        'id' => 4,
-        'baslik' => 'Yangınla Mücadele',
-        'fiyat' => 279.00,
-        'eski_fiyat' => 379.00
-    ],
-    [
-        'id' => 5,
-        'baslik' => 'Radyo Operatörlüğü',
-        'fiyat' => 399.00,
-        'eski_fiyat' => 499.00
-    ],
-    [
-        'id' => 6,
-        'baslik' => 'Çevre Koruma',
-        'fiyat' => 199.00,
-        'eski_fiyat' => 299.00
-    ]
-];
+// Kullanıcının almadığı eğitimleri çek
+$egitimler = fetchAll("
+    SELECT
+        c.id,
+        c.title as baslik,
+        c.price as fiyat,
+        c.discount_price as eski_fiyat,
+        c.duration_hours
+    FROM courses c
+    WHERE c.id NOT IN (
+        SELECT course_id FROM user_courses WHERE user_id = ?
+    )
+    ORDER BY c.created_at DESC
+", [$userId]);
+
+include 'includes/header.php';
 ?>
 
 <!-- Page Header -->

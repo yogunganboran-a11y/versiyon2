@@ -1,31 +1,38 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'Meta Mesajları';
-include 'includes/header.php';
 
-// Demo sohbet verileri - Facebook ve Instagram karışık
-$chats = [];
-$names = ['Ahmet Yılmaz', 'Mehmet Demir', 'Ayşe Kaya', 'Fatma Özdemir', 'Ali Şahin', 'Zeynep Çelik', 'Mustafa Aydın', 'Elif Kara', 'Hasan Yıldız', 'Selin Arslan'];
-$avatars = ['AY', 'MD', 'AK', 'FÖ', 'AŞ', 'ZÇ', 'MA', 'EK', 'HY', 'SA'];
-$usernames = ['ahmet_ylmz', 'mehmet_dmr', 'ayse.kaya', 'fatma.ozd', 'ali.sahin', 'zeynep_clk', 'mustafa.aydn', 'elif_kara', 'hasan.yldz', 'selin.arsln'];
-$messages = ['Merhaba', 'Teşekkürler 👍', 'Bu ürün hakkında bilgi alabilir miyim?', 'Kargo ne zaman gelir?', 'Eğitim fiyatları nedir?', 'Kayıt olmak istiyorum', 'Ürün var mı?', 'İade yapabilir miyim?', 'Sertifika ne zaman verilir?', 'Tamam 🙂'];
-$times = ['Bugün', 'Dün', '2 gün önce', '3 gün önce', '1 hafta önce'];
-$platforms = ['facebook', 'instagram'];
+// Meta mesajlarını veritabanından çek (Facebook ve Instagram)
+$chats = fetchAll("
+    SELECT
+        mm.*,
+        u.name,
+        u.surname
+    FROM meta_messages mm
+    LEFT JOIN users u ON mm.user_id = u.id
+    ORDER BY mm.last_activity DESC
+    LIMIT 100
+");
 
-for ($i = 1; $i <= 60; $i++) {
-    $nameIndex = ($i - 1) % 10;
-    $platform = $platforms[$i % 2];
+// Avatar oluşturma
+function getMetaAvatar($name, $surname) {
+    $first = $name ? mb_substr($name, 0, 1, 'UTF-8') : '';
+    $last = $surname ? mb_substr($surname, 0, 1, 'UTF-8') : '';
+    return strtoupper($first . $last) ?: '?';
+}
 
-    $chats[] = [
-        'id' => $i,
-        'name' => $names[$nameIndex] . ' ' . $i,
-        'username' => '@' . $usernames[$nameIndex] . $i,
-        'avatar' => $avatars[$nameIndex],
-        'platform' => $platform,
-        'last_message' => $messages[($i - 1) % 10],
-        'time' => $times[($i - 1) % 5],
-        'unread' => $i <= 6 ? rand(0, 3) : 0,
-        'online' => $i % 4 === 0
-    ];
+// Zaman farkı
+function metaTimeAgo($datetime) {
+    if (!$datetime) return '';
+    $now = new DateTime();
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+    if ($diff->d == 0) return 'Bugün';
+    if ($diff->d == 1) return 'Dün';
+    if ($diff->d < 7) return $diff->d . ' gün önce';
+    return $ago->format('d.m.Y');
 }
 ?>
 
