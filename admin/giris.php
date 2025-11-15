@@ -1,5 +1,5 @@
 <?php
-session_start();
+require_once 'entegrasyon/config.php';
 
 // Eğer zaten giriş yapmışsa dashboard'a yönlendir
 if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true) {
@@ -7,30 +7,52 @@ if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true
     exit;
 }
 
+$error = '';
+
 // Giriş işlemi
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $email = $_POST['email'] ?? '';
+    $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    
-    // Demo için sabit değerler (backend olunca değişecek)
-    if ($email === 'admin@egitim.com' && $password === '123456') {
-        $_SESSION['admin_logged_in'] = true;
-        $_SESSION['admin_email'] = $email;
-        $_SESSION['admin_name'] = 'Sistem Yöneticisi';
-        header('Location: index.php');
-        exit;
+
+    if (empty($email) || empty($password)) {
+        $error = 'E-posta ve şifre alanları zorunludur!';
     } else {
-        $error = 'E-posta veya şifre hatalı!';
+        // Veritabanından admin bilgisini çek
+        $admin = fetchOne("SELECT * FROM admins WHERE email = ?", [$email]);
+
+        if ($admin && verifyPassword($password, $admin['password'])) {
+            // Giriş başarılı
+            $_SESSION['admin_logged_in'] = true;
+            $_SESSION['admin_id'] = $admin['id'];
+            $_SESSION['admin_email'] = $admin['email'];
+            $_SESSION['admin_name'] = $admin['full_name'];
+            $_SESSION['admin_role'] = $admin['role'];
+
+            // Son giriş zamanını güncelle
+            query("UPDATE admins SET last_login = NOW() WHERE id = ?", [$admin['id']]);
+
+            header('Location: index.php');
+            exit;
+        } else {
+            $error = 'E-posta veya şifre hatalı!';
+        }
     }
 }
+
+$logoUrl = getLogoUrl();
+$faviconUrl = getFaviconUrl();
+$siteName = getSiteName();
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Admin Giriş - Eğitim Platformu</title>
+    <title>Admin Giriş - <?php echo $siteName; ?></title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php if ($faviconUrl): ?>
+    <link rel="icon" type="image/png" href="<?php echo $faviconUrl; ?>">
+    <?php endif; ?>
     <style>
         * {
             margin: 0;
@@ -245,8 +267,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <!-- Logo -->
         <div class="logo-container">
             <div class="logo-placeholder">
-                <!-- Logo admin panelden yüklenecek -->
-                <i class="fas fa-graduation-cap"></i>
+                <?php if ($logoUrl): ?>
+                    <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>">
+                <?php else: ?>
+                    <i class="fas fa-graduation-cap"></i>
+                <?php endif; ?>
             </div>
         </div>
 
@@ -257,7 +282,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <p>Devam etmek için giriş bilgilerinizi girin</p>
             </div>
 
-            <?php if (isset($error)): ?>
+            <?php if ($error): ?>
                 <div class="error-message">
                     <i class="fas fa-exclamation-circle"></i>
                     <span><?php echo $error; ?></span>
@@ -269,14 +294,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="email">E-posta</label>
                     <div class="input-wrapper">
                         <i class="fas fa-envelope"></i>
-                        <input 
-                            type="email" 
-                            id="email" 
-                            name="email" 
-                            class="form-control" 
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            class="form-control"
                             placeholder="admin@egitim.com"
                             required
                             autocomplete="email"
+                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>"
                         >
                     </div>
                 </div>
@@ -285,11 +311,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <label for="password">Şifre</label>
                     <div class="input-wrapper">
                         <i class="fas fa-lock"></i>
-                        <input 
-                            type="password" 
-                            id="password" 
-                            name="password" 
-                            class="form-control" 
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            class="form-control"
                             placeholder="••••••••"
                             required
                             autocomplete="current-password"
@@ -311,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <script>
         // Brute Force Koruması
         const MAX_ATTEMPTS = 5;
-        const LOCKOUT_TIME = 30 * 1000; // 30 saniye (test için - production'da 5 * 60 * 1000 yapın)
+        const LOCKOUT_TIME = 5 * 60 * 1000; // 5 dakika
 
         function checkLoginAttempts() {
             const attempts = JSON.parse(localStorage.getItem('loginAttempts') || '{"count": 0, "lockoutUntil": 0}');
@@ -324,7 +350,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
 
             if (attempts.lockoutUntil > 0 && attempts.lockoutUntil <= now) {
-                // Reset attempts after lockout period
                 localStorage.setItem('loginAttempts', JSON.stringify({"count": 0, "lockoutUntil": 0}));
             }
 
@@ -337,13 +362,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if (attempts.count >= MAX_ATTEMPTS) {
                 attempts.lockoutUntil = Date.now() + LOCKOUT_TIME;
-                alert('Çok fazla hatalı giriş denemesi yaptınız. 30 saniye boyunca giriş yapamazsınız.');
+                alert('Çok fazla hatalı giriş denemesi yaptınız. 5 dakika boyunca giriş yapamazsınız.');
             }
 
             localStorage.setItem('loginAttempts', JSON.stringify(attempts));
         }
 
-        // Form submit kontrolü
         const loginForm = document.querySelector('form');
         if (loginForm) {
             loginForm.addEventListener('submit', function(e) {
@@ -354,12 +378,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             });
         }
 
-        // Sayfa yüklendiğinde hatalı girişi kontrol et
-        <?php if (isset($error)): ?>
+        <?php if ($error): ?>
         recordFailedAttempt();
         <?php endif; ?>
 
-        // Başarılı giriş durumunda attempts'i sıfırla
         <?php if (isset($_SESSION['admin_logged_in']) && $_SESSION['admin_logged_in'] === true): ?>
         localStorage.removeItem('loginAttempts');
         <?php endif; ?>

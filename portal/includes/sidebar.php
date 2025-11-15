@@ -6,7 +6,15 @@
     
     <!-- Logo -->
     <div class="sidebar-logo">
-        <img src="assets/img/logo.png" alt="Logo" onerror="this.style.display='none'">
+        <?php
+        $logoUrl = getLogoUrl();
+        $siteName = getSiteName();
+        if ($logoUrl):
+        ?>
+            <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>">
+        <?php else: ?>
+            <div style="color: #3b82f6; font-size: 2rem;"><i class="fas fa-graduation-cap"></i></div>
+        <?php endif; ?>
         <!-- Notification Icon (Desktop only) -->
         <div class="sidebar-notification-icon" id="sidebarNotificationIcon">
             <i class="fas fa-bell"></i>
@@ -53,8 +61,8 @@
                 <?php endif; ?>
             </div>
             <div class="user-details-compact">
-                <p class="user-name"><?php echo $user['ad'] . ' ' . $user['soyad']; ?></p>
-                <p class="user-phone"><?php echo $user['telefon']; ?></p>
+                <p class="user-name"><?php echo isset($user['name']) ? $user['name'] . ' ' . ($user['surname'] ?? '') : 'Kullanıcı'; ?></p>
+                <p class="user-phone"><?php echo $user['phone'] ?? ''; ?></p>
             </div>
         </div>
         <a href="logout.php" class="btn-logout">
