@@ -4,63 +4,59 @@ require_once 'includes/auth-check.php';
 $page_title = 'Eğitim Testi';
 $page_css = 'assets/css/egitim-test.css';
 
+// Eğitim ID'sini al
+$courseId = intval($_GET['id'] ?? 0);
+$userId = $_SESSION['user_id'];
+
+// Eğitim bilgilerini çek
+$course = fetchOne("
+    SELECT
+        c.*,
+        uc.video_watched,
+        uc.test_completed
+    FROM courses c
+    JOIN user_courses uc ON uc.course_id = c.id
+    WHERE c.id = ? AND uc.user_id = ?
+", [$courseId, $userId]);
+
+if (!$course) {
+    header('Location: egitimler.php');
+    exit;
+}
+
+// Video izlenmemiş ise teste izin verme
+if (!$course['video_watched']) {
+    header('Location: egitim-video.php?id=' . $courseId);
+    exit;
+}
+
+$egitim_adi = $course['title'];
+
+// Soruları veritabanından çek
+$questions = fetchAll("
+    SELECT *
+    FROM course_test_questions
+    WHERE course_id = ?
+    ORDER BY id ASC
+", [$courseId]);
+
+// Eski format için dönüştür
+$sorular = [];
+foreach ($questions as $q) {
+    $sorular[] = [
+        'id' => $q['id'],
+        'soru' => $q['question_text'],
+        'secenekler' => [
+            'A' => $q['option_a'],
+            'B' => $q['option_b'],
+            'C' => $q['option_c'],
+            'D' => $q['option_d']
+        ],
+        'dogru' => $q['correct_answer']
+    ];
+}
+
 include 'includes/header.php';
-
-$egitim_adi = "Temel Denizcilik";
-
-// Sorular
-$sorular = [
-    [
-        'soru' => 'Denizcilik temel bilgilerinden hangisi doğrudur?',
-        'secenekler' => [
-            'A' => 'Gemiler sağdan sollama yapar',
-            'B' => 'Gemiler soldan sollama yapar',
-            'C' => 'Gemiler karşıdan sollama yapar',
-            'D' => 'Sollama kuralı yoktur'
-        ],
-        'dogru' => 'B'
-    ],
-    [
-        'soru' => 'Can yeleği kullanımında en önemli kural nedir?',
-        'secenekler' => [
-            'A' => 'Renkli olması',
-            'B' => 'Doğru beden ölçüsünde olması',
-            'C' => 'Pahalı olması',
-            'D' => 'Yeni model olması'
-        ],
-        'dogru' => 'B'
-    ],
-    [
-        'soru' => 'Denizde acil durum sinyali nasıl verilir?',
-        'secenekler' => [
-            'A' => 'SOS sinyali ile',
-            'B' => 'Bayrak sallayarak',
-            'C' => 'Düdük çalarak',
-            'D' => 'Hepsi'
-        ],
-        'dogru' => 'D'
-    ],
-    [
-        'soru' => 'Gemi rotası belirlenirken en önemli faktör nedir?',
-        'secenekler' => [
-            'A' => 'Hava durumu',
-            'B' => 'Deniz akıntıları',
-            'C' => 'Yakıt tasarrufu',
-            'D' => 'Hepsi'
-        ],
-        'dogru' => 'D'
-    ],
-    [
-        'soru' => 'Denizde güvenlik ekipmanlarından hangisi zorunludur?',
-        'secenekler' => [
-            'A' => 'Can yeleği',
-            'B' => 'Yangın söndürücü',
-            'C' => 'İlk yardım çantası',
-            'D' => 'Hepsi'
-        ],
-        'dogru' => 'D'
-    ]
-];
 ?>
 
 <!-- Test Container -->

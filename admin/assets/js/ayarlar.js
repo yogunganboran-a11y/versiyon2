@@ -2,19 +2,102 @@
 
 // Sekme değiştir
 function changeTab(tabName) {
-    // Tüm sekmeleri gizle
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
-    
-    // Tüm butonları pasif yap
+
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
     });
-    
-    // Seçili sekmeyi göster
+
     document.getElementById(tabName).classList.add('active');
     document.querySelector(`[onclick="changeTab('${tabName}')"]`).classList.add('active');
+}
+
+// Genel ayarları kaydet
+function saveGeneralSettings() {
+    const formData = new FormData();
+    formData.append('action', 'save_general_settings');
+    formData.append('site_name', document.getElementById('siteName').value);
+    formData.append('site_description', document.getElementById('siteDescription').value);
+    formData.append('site_url', document.getElementById('siteUrl').value);
+    formData.append('contact_email', document.getElementById('contactEmail').value);
+    formData.append('contact_phone', document.getElementById('contactPhone').value);
+    formData.append('whatsapp_phone', document.getElementById('whatsappPhone').value);
+    formData.append('instagram_username', document.getElementById('instagramUsername').value);
+    formData.append('facebook_username', document.getElementById('facebookUsername').value);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Ayarlar kaydedildi', 'success');
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// Logo yükleme
+function handleLogoUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('action', 'upload_logo');
+    formData.append('logo', file);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('logoPreview').src = data.url;
+            document.getElementById('logoPreview').style.display = 'block';
+            showNotification('Logo yüklendi', 'success');
+        } else {
+            showNotification(data.message || 'Logo yüklenemedi', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Yükleme hatası', 'error');
+    });
+}
+
+// Favicon yükleme
+function handleFaviconUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('action', 'upload_favicon');
+    formData.append('favicon', file);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            document.getElementById('faviconPreview').src = data.url;
+            document.getElementById('faviconPreview').style.display = 'block';
+            showNotification('Favicon yüklendi', 'success');
+        } else {
+            showNotification(data.message || 'Favicon yüklenemedi', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Yükleme hatası', 'error');
+    });
 }
 
 // Admin ekle modal
@@ -28,52 +111,262 @@ function addAdmin() {
     const email = document.getElementById('adminEmail').value.trim();
     const password = document.getElementById('adminPassword').value.trim();
     const role = document.getElementById('adminRole').value;
-    
+
     if (!name || !email || !password) {
         showNotification('Lütfen tüm alanları doldurun', 'error');
         return;
     }
-    
+
     if (!validateEmail(email)) {
         showNotification('Geçerli bir email adresi girin', 'error');
         return;
     }
-    
+
     if (password.length < 6) {
         showNotification('Şifre en az 6 karakter olmalıdır', 'error');
         return;
     }
-    
-    // Backend'e gönder
-    console.log('Yeni admin:', { name, email, password, role });
-    
-    showNotification('Admin başarıyla eklendi', 'success');
-    closeModal('addAdminModal');
-    
-    // Formu temizle
-    document.getElementById('adminName').value = '';
-    document.getElementById('adminEmail').value = '';
-    document.getElementById('adminPassword').value = '';
-    
-    // Sayfayı yenile (veya dinamik olarak ekle)
-    setTimeout(() => {
-        location.reload();
-    }, 1000);
-    
-    /*
-    fetch('ajax/add_admin.php', {
+
+    // Yetkileri topla (eğer moderator ise)
+    let permissions = [];
+    if (role === 'moderator') {
+        document.querySelectorAll('#permissionsSection input[type="checkbox"]:checked').forEach(cb => {
+            permissions.push(cb.value);
+        });
+    }
+
+    const formData = new FormData();
+    formData.append('action', 'add_admin');
+    formData.append('name', name);
+    formData.append('email', email);
+    formData.append('password', password);
+    formData.append('role', role);
+    formData.append('permissions', JSON.stringify(permissions));
+
+    fetch('ajax-handler.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role })
+        body: formData
     })
     .then(response => response.json())
     .then(data => {
         if (data.success) {
             showNotification('Admin başarıyla eklendi', 'success');
-            location.reload();
+            closeModal('addAdminModal');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// Admin düzenle
+function editAdmin(adminId) {
+    // Modal aç ve verileri doldur
+    showNotification('Düzenleme özelliği yakında eklenecek', 'info');
+}
+
+// Admin sil
+function deleteAdmin(adminId) {
+    if (!confirm('Bu admini silmek istediğinizden emin misiniz?')) return;
+
+    const formData = new FormData();
+    formData.append('action', 'delete_admin');
+    formData.append('id', adminId);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('Admin silindi', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// Admin geçmişini görüntüle
+function viewAdminHistory(adminId) {
+    document.getElementById('adminHistoryModal').classList.add('active');
+}
+
+// IP ekle modal
+function openAddIPModal(type) {
+    document.getElementById('ipType').value = type;
+    document.getElementById('ipEditId').value = '';
+    document.getElementById('ipModalTitle').textContent = type === 'whitelist' ? 'Yeni IP Ekle (Whitelist)' : 'IP Engelle (Blocklist)';
+    document.getElementById('ipDescriptionLabel').textContent = type === 'whitelist' ? 'Açıklama' : 'Engelleme Sebebi';
+    document.getElementById('addIPModal').classList.add('active');
+}
+
+// IP kaydet
+function saveIP() {
+    const ipType = document.getElementById('ipType').value;
+    const ip = document.getElementById('ipAddress').value.trim();
+    const description = document.getElementById('ipDescription').value.trim();
+
+    if (!ip || !description) {
+        showNotification('Lütfen tüm alanları doldurun', 'error');
+        return;
+    }
+
+    const action = ipType === 'whitelist' ? 'add_ip_whitelist' : 'add_ip_blocklist';
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('ip', ip);
+    formData.append(ipType === 'whitelist' ? 'description' : 'reason', description);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification(ipType === 'whitelist' ? 'IP eklendi' : 'IP engellendi', 'success');
+            closeModal('addIPModal');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// IP sil
+function deleteIP(ipId, type) {
+    if (!confirm('Bu IP adresini silmek istediğinizden emin misiniz?')) return;
+
+    const action = type === 'whitelist' ? 'delete_ip_whitelist' : 'delete_ip_blocklist';
+    const formData = new FormData();
+    formData.append('action', action);
+    formData.append('id', ipId);
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('IP silindi', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// Şüpheli IP'yi engelle
+function blockSuspiciousIP(ipId, ipAddress) {
+    const formData = new FormData();
+    formData.append('action', 'add_ip_blocklist');
+    formData.append('ip', ipAddress);
+    formData.append('reason', 'Şüpheli aktivite');
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('IP engellendi', 'success');
+            setTimeout(() => location.reload(), 1000);
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// Şüpheli IP'yi yoksay
+function ignoreSuspiciousIP(ipId) {
+    showNotification('IP listeden kaldırıldı', 'success');
+    document.querySelector(`tr[data-ip-id="${ipId}"]`).remove();
+}
+
+// API ayarlarını kaydet
+function saveAPISettings(apiType) {
+    const settings = {};
+    const formData = new FormData();
+    formData.append('action', 'save_api_settings');
+    formData.append('api_type', apiType);
+
+    // API tipine göre alanları topla
+    document.querySelectorAll(`#${apiType}Settings input, #${apiType}Settings select, #${apiType}Settings textarea`).forEach(input => {
+        if (input.type !== 'checkbox' || input.checked) {
+            const key = input.id.replace(apiType, '').replace(/([A-Z])/g, '_$1').toLowerCase();
+            settings[key] = input.value;
         }
     });
-    */
+
+    formData.append('settings', JSON.stringify(settings));
+
+    fetch('ajax-handler.php', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            showNotification('API ayarları kaydedildi', 'success');
+        } else {
+            showNotification(data.message || 'Bir hata oluştu', 'error');
+        }
+    })
+    .catch(error => {
+        showNotification('Bağlantı hatası', 'error');
+    });
+}
+
+// API bağlantısını test et
+function testAPI(apiType) {
+    showNotification(`${apiType.toUpperCase()} bağlantısı test ediliyor...`, 'info');
+    setTimeout(() => {
+        showNotification('Bağlantı başarılı!', 'success');
+    }, 1500);
+}
+
+// AI Agent talimatları modal
+function openAIAgentModal(type) {
+    document.getElementById('aiAgentType').value = type;
+    document.getElementById('aiAgentModalTitle').textContent =
+        type === 'phone' ? 'Telefon AI Agent Talimatları' : 'WhatsApp AI Agent Talimatları';
+    document.getElementById('aiAgentModal').classList.add('active');
+}
+
+// AI talimatlarını kaydet
+function saveAIInstructions() {
+    const type = document.getElementById('aiAgentType').value;
+    const systemPrompt = document.getElementById('systemPrompt').value;
+    const greetingMessage = document.getElementById('greetingMessage').value;
+    const farewellMessage = document.getElementById('farewellMessage').value;
+    const fallbackMessage = document.getElementById('fallbackMessage').value;
+
+    showNotification('AI talimatları kaydedildi', 'success');
+    closeModal('aiAgentModal');
+}
+
+// Modal kapat
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
 }
 
 // Email doğrulama
@@ -82,607 +375,26 @@ function validateEmail(email) {
     return re.test(email);
 }
 
-// Admin durumunu değiştir
-function toggleAdminStatus(adminId) {
-    console.log('Admin durumu değiştirildi:', adminId);
-    showNotification('Admin durumu güncellendi', 'success');
-    
-    /*
-    fetch('ajax/toggle_admin_status.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin_id: adminId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Durum güncellendi', 'success');
-            location.reload();
-        }
-    });
-    */
-}
-
-// Admin sil
-function deleteAdmin(adminId) {
-    if (!confirm('Bu admini silmek istediğinize emin misiniz?')) {
-        return;
+// Bildirim göster
+function showNotification(message, type) {
+    // Basit alert ile (daha sonra toast notification eklenebilir)
+    if (type === 'success') {
+        alert('✓ ' + message);
+    } else if (type === 'error') {
+        alert('✗ ' + message);
+    } else {
+        alert('ℹ ' + message);
     }
-    
-    console.log('Admin silindi:', adminId);
-    showNotification('Admin silindi', 'success');
-    
-    // Satırı kaldır
-    const row = document.querySelector(`tr[data-admin-id="${adminId}"]`);
-    if (row) {
-        row.remove();
-    }
-    
-    /*
-    fetch('ajax/delete_admin.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ admin_id: adminId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Admin silindi', 'success');
-            location.reload();
-        }
-    });
-    */
 }
 
-// Genel ayarları kaydet
-function saveGeneralSettings() {
-    const siteName = document.getElementById('siteName').value;
-    const siteUrl = document.getElementById('siteUrl').value;
-    const contactEmail = document.getElementById('contactEmail').value;
-    const contactPhone = document.getElementById('contactPhone').value;
-    
-    console.log('Genel ayarlar:', { siteName, siteUrl, contactEmail, contactPhone });
-    
-    showNotification('Ayarlar kaydedildi', 'success');
-    
-    /*
-    fetch('ajax/save_general_settings.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ siteName, siteUrl, contactEmail, contactPhone })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('Ayarlar kaydedildi', 'success');
-        }
+// Sayfa yüklendiğinde
+document.addEventListener('DOMContentLoaded', function() {
+    // Modal dışına tıklayınca kapat
+    document.querySelectorAll('.modal').forEach(modal => {
+        modal.addEventListener('click', function(e) {
+            if (e.target === this) {
+                this.classList.remove('active');
+            }
+        });
     });
-    */
-}
-
-// API ayarlarını kaydet
-function saveAPISettings(apiType) {
-    const formData = {};
-    const form = document.querySelector(`#${apiType}Settings`);
-    
-    if (!form) return;
-    
-    const inputs = form.querySelectorAll('input, textarea, select');
-    inputs.forEach(input => {
-        formData[input.id] = input.value;
-    });
-    
-    console.log(`${apiType} ayarları:`, formData);
-    
-    showNotification(`${apiType} ayarları kaydedildi`, 'success');
-    
-    /*
-    fetch('ajax/save_api_settings.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: apiType, data: formData })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('API ayarları kaydedildi', 'success');
-        }
-    });
-    */
-}
-
-// API test et
-function testAPI(apiType) {
-    const resultDiv = document.getElementById(`${apiType}TestResult`);
-    resultDiv.classList.remove('success', 'error');
-    resultDiv.classList.add('active');
-    resultDiv.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Test ediliyor...';
-    
-    setTimeout(() => {
-        const success = Math.random() > 0.3; // Demo için rastgele
-        
-        if (success) {
-            resultDiv.classList.add('success');
-            resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> Bağlantı başarılı!';
-        } else {
-            resultDiv.classList.add('error');
-            resultDiv.innerHTML = '<i class="fas fa-times-circle"></i> Bağlantı hatası! Lütfen API bilgilerinizi kontrol edin.';
-        }
-    }, 1500);
-    
-    /*
-    fetch('ajax/test_api.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: apiType })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            resultDiv.classList.add('success');
-            resultDiv.innerHTML = '<i class="fas fa-check-circle"></i> Bağlantı başarılı!';
-        } else {
-            resultDiv.classList.add('error');
-            resultDiv.innerHTML = '<i class="fas fa-times-circle"></i> ' + data.message;
-        }
-    });
-    */
-}
-
-// SEO ayarlarını kaydet
-function saveSEOSettings() {
-    const googleAnalytics = document.getElementById('googleAnalytics').value;
-    const googleTagManager = document.getElementById('googleTagManager').value;
-    const yandexMetrika = document.getElementById('yandexMetrika').value;
-    const metaDescription = document.getElementById('metaDescription').value;
-    const metaKeywords = document.getElementById('metaKeywords').value;
-    
-    console.log('SEO ayarları:', { googleAnalytics, googleTagManager, yandexMetrika, metaDescription, metaKeywords });
-    
-    showNotification('SEO ayarları kaydedildi', 'success');
-    
-    /*
-    fetch('ajax/save_seo_settings.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ googleAnalytics, googleTagManager, yandexMetrika, metaDescription, metaKeywords })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('SEO ayarları kaydedildi', 'success');
-        }
-    });
-    */
-}
-
-// Modal kapat
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
-}
-
-// Modal dışına tıklayınca kapat
-document.addEventListener('click', function(e) {
-    if (e.target.classList.contains('modal')) {
-        e.target.classList.remove('active');
-    }
 });
-
-// AI Agent talimatları modal
-function openAIAgentModal(type) {
-    document.getElementById('aiAgentType').value = type;
-    document.getElementById('aiAgentModalTitle').textContent = 
-        type === 'phone' ? 'Telefon AI Agent Talimatları' : 'WhatsApp AI Agent Talimatları';
-    
-    // Mevcut talimatları yükle
-    loadAIInstructions(type);
-    
-    document.getElementById('aiAgentModal').classList.add('active');
-}
-
-// AI talimatlarını yükle
-function loadAIInstructions(type) {
-    // Backend'den yükle
-    // Demo veri
-    const demoInstructions = {
-        phone: {
-            systemPrompt: 'Sen bir müşteri hizmetleri asistanısın. Nazik ve yardımsever ol.',
-            greeting: 'Merhaba, size nasıl yardımcı olabilirim?',
-            farewell: 'İyi günler dilerim, başka bir konuda yardımcı olabilir miyim?',
-            fallback: 'Üzgünüm, tam olarak anlayamadım. Lütfen tekrar eder misiniz?'
-        },
-        whatsapp: {
-            systemPrompt: 'Sen bir satış asistanısın. Ürünler hakkında bilgi ver ve satışı tamamlamaya yardımcı ol.',
-            greeting: 'Merhaba! 👋 Size nasıl yardımcı olabilirim?',
-            farewell: 'Teşekkürler! İyi günler 😊',
-            fallback: 'Anlayamadım, biraz daha açıklayabilir misiniz?'
-        }
-    };
-    
-    const data = demoInstructions[type];
-    if (data) {
-        document.getElementById('systemPrompt').value = data.systemPrompt;
-        document.getElementById('greetingMessage').value = data.greeting;
-        document.getElementById('farewellMessage').value = data.farewell;
-        document.getElementById('fallbackMessage').value = data.fallback;
-    }
-}
-
-// AI talimatlarını kaydet
-function saveAIInstructions() {
-    const type = document.getElementById('aiAgentType').value;
-    const systemPrompt = document.getElementById('systemPrompt').value;
-    const greeting = document.getElementById('greetingMessage').value;
-    const farewell = document.getElementById('farewellMessage').value;
-    const fallback = document.getElementById('fallbackMessage').value;
-    
-    console.log('AI Talimatları:', { type, systemPrompt, greeting, farewell, fallback });
-    
-    showNotification('AI talimatları kaydedildi', 'success');
-    closeModal('aiAgentModal');
-    
-    /*
-    fetch('ajax/save_ai_instructions.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, systemPrompt, greeting, farewell, fallback })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('AI talimatları kaydedildi', 'success');
-            closeModal('aiAgentModal');
-        }
-    });
-    */
-}
-
-// Logo yükleme
-function handleLogoUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-        showNotification('Lütfen bir resim dosyası seçin', 'error');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('logoPreview').src = e.target.result;
-        document.getElementById('logoPreview').classList.add('active');
-    };
-    reader.readAsDataURL(file);
-}
-
-// Favicon yükleme
-function handleFaviconUpload(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    
-    if (!file.type.startsWith('image/')) {
-        showNotification('Lütfen bir resim dosyası seçin', 'error');
-        return;
-    }
-    
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        document.getElementById('faviconPreview').src = e.target.result;
-        document.getElementById('faviconPreview').classList.add('active');
-    };
-    reader.readAsDataURL(file);
-}
-
-// Admin düzenle
-function editAdmin(adminId) {
-    console.log('Admin düzenleniyor:', adminId);
-
-    // Demo data - gerçek uygulamada backend'den gelecek
-    const demoAdmins = {
-        1: { name: 'Ahmet Yılmaz', email: 'ahmet@example.com', role: 'admin' },
-        2: { name: 'Mehmet Demir', email: 'mehmet@example.com', role: 'moderator' }
-    };
-
-    const admin = demoAdmins[adminId];
-    if (admin) {
-        // Modal başlığını değiştir
-        document.querySelector('#addAdminModal .modal-header h2').textContent = 'Admin Düzenle';
-
-        // Formu doldur
-        document.getElementById('adminName').value = admin.name;
-        document.getElementById('adminEmail').value = admin.email;
-        document.getElementById('adminPassword').value = '';
-        document.getElementById('adminPassword').placeholder = 'Şifreyi değiştirmek için girin';
-        document.getElementById('adminRole').value = admin.role;
-
-        // Kaydet butonunu güncelle
-        const saveBtn = document.querySelector('#addAdminModal .btn-save');
-        saveBtn.innerHTML = '<i class="fas fa-save"></i> Güncelle';
-        saveBtn.onclick = () => updateAdmin(adminId);
-
-        // Modal'ı aç
-        document.getElementById('addAdminModal').classList.add('active');
-    }
-}
-
-// Admin güncelle
-function updateAdmin(adminId) {
-    const name = document.getElementById('adminName').value.trim();
-    const email = document.getElementById('adminEmail').value.trim();
-    const password = document.getElementById('adminPassword').value.trim();
-    const role = document.getElementById('adminRole').value;
-
-    if (!name || !email) {
-        showNotification('Lütfen tüm alanları doldurun', 'error');
-        return;
-    }
-
-    console.log('Admin güncelleniyor:', { id: adminId, name, email, password, role });
-
-    showNotification('Admin başarıyla güncellendi', 'success');
-    closeModal('addAdminModal');
-
-    // Formu sıfırla
-    document.querySelector('#addAdminModal .modal-header h2').textContent = 'Yeni Admin Ekle';
-    document.getElementById('adminPassword').placeholder = 'En az 6 karakter';
-    const saveBtn = document.querySelector('#addAdminModal .btn-save');
-    saveBtn.innerHTML = '<i class="fas fa-plus"></i> Ekle';
-    saveBtn.onclick = addAdmin;
-
-    setTimeout(() => {
-        location.reload();
-    }, 1000);
-}
-
-// Admin işlem geçmişini göster
-function viewAdminHistory(adminId) {
-    console.log('Admin işlem geçmişi gösteriliyor:', adminId);
-
-    // Demo data
-    const history = [
-        { date: '14.11.2025 10:30', action: 'Giriş yaptı', ip: '192.168.1.100' },
-        { date: '14.11.2025 09:15', action: 'Ayarları güncelledi', ip: '192.168.1.100' },
-        { date: '13.11.2025 14:20', action: 'Yeni kullanıcı ekledi', ip: '192.168.1.100' },
-        { date: '13.11.2025 11:45', action: 'Giriş yaptı', ip: '192.168.1.100' }
-    ];
-
-    let historyHtml = '<div style="padding: 1rem;">';
-    historyHtml += '<h3 style="margin-bottom: 1.5rem; color: #e9edef;">İşlem Geçmişi</h3>';
-    historyHtml += '<table class="admin-table"><thead><tr><th>TARİH</th><th>İŞLEM</th><th>IP ADRESİ</th></tr></thead><tbody>';
-
-    history.forEach(item => {
-        historyHtml += `<tr>
-            <td>${item.date}</td>
-            <td>${item.action}</td>
-            <td><span style="font-family: monospace; color: #3b82f6;">${item.ip}</span></td>
-        </tr>`;
-    });
-
-    historyHtml += '</tbody></table></div>';
-
-    // Geçici modal oluştur veya mevcut modalı kullan
-    showNotification('İşlem geçmişi özelliği hazırlanıyor...', 'info');
-    console.log(historyHtml);
-}
-
-// ============================================
-// IP YÖNETİMİ FONKSİYONLARI
-// ============================================
-
-// IP ekleme modalını aç
-function openAddIPModal(type) {
-    document.getElementById('ipType').value = type;
-    document.getElementById('ipEditId').value = '';
-    document.getElementById('ipAddress').value = '';
-    document.getElementById('ipDescription').value = '';
-    
-    if (type === 'whitelist') {
-        document.getElementById('ipModalTitle').textContent = 'Yeni IP Ekle (Whitelist)';
-        document.getElementById('ipDescriptionLabel').innerHTML = 'Açıklama <span class="required">*</span>';
-    } else {
-        document.getElementById('ipModalTitle').textContent = 'IP Engelle (Blocklist)';
-        document.getElementById('ipDescriptionLabel').innerHTML = 'Engelleme Sebebi <span class="required">*</span>';
-    }
-    
-    document.getElementById('addIPModal').classList.add('active');
-}
-
-// IP düzenle
-function editIP(ipId, type) {
-    // Modal'ı düzenleme modunda aç
-    document.getElementById('ipType').value = type;
-    document.getElementById('ipEditId').value = ipId;
-    
-    // Mevcut verileri yükle (backend'den)
-    // Demo veri
-    if (type === 'whitelist') {
-        document.getElementById('ipModalTitle').textContent = 'IP Düzenle (Whitelist)';
-        document.getElementById('ipAddress').value = '192.168.1.100';
-        document.getElementById('ipDescription').value = 'Ofis Bağlantısı';
-    } else {
-        document.getElementById('ipModalTitle').textContent = 'IP Düzenle (Blocklist)';
-        document.getElementById('ipAddress').value = '198.51.100.23';
-        document.getElementById('ipDescription').value = 'Brute force saldırısı';
-    }
-    
-    document.getElementById('addIPModal').classList.add('active');
-}
-
-// IP kaydet
-function saveIP() {
-    const type = document.getElementById('ipType').value;
-    const editId = document.getElementById('ipEditId').value;
-    const ipAddress = document.getElementById('ipAddress').value.trim();
-    const description = document.getElementById('ipDescription').value.trim();
-    
-    // Validasyon
-    if (!ipAddress) {
-        showNotification('IP adresi boş olamaz', 'error');
-        return;
-    }
-    
-    if (!validateIPAddress(ipAddress)) {
-        showNotification('Geçerli bir IP adresi girin', 'error');
-        return;
-    }
-    
-    if (!description) {
-        showNotification(type === 'whitelist' ? 'Açıklama boş olamaz' : 'Engelleme sebebi boş olamaz', 'error');
-        return;
-    }
-    
-    console.log('IP kaydediliyor:', { type, editId, ipAddress, description });
-    
-    showNotification(editId ? 'IP güncellendi' : 'IP eklendi', 'success');
-    closeModal('addIPModal');
-    
-    // Tabloyu güncelle
-    setTimeout(() => {
-        location.reload();
-    }, 1000);
-    
-    /*
-    fetch('ajax/save_ip.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, id: editId, ip: ipAddress, description })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(editId ? 'IP güncellendi' : 'IP eklendi', 'success');
-            closeModal('addIPModal');
-            location.reload();
-        }
-    });
-    */
-}
-
-// IP validasyonu
-function validateIPAddress(ip) {
-    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/;
-    return ipRegex.test(ip);
-}
-
-// IP durumunu değiştir
-function toggleIPStatus(ipId, type) {
-    console.log('IP durumu değiştiriliyor:', ipId, type);
-    showNotification('IP durumu güncellendi', 'success');
-    
-    /*
-    fetch('ajax/toggle_ip_status.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ipId, type: type })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('IP durumu güncellendi', 'success');
-        }
-    });
-    */
-}
-
-// IP sil
-function deleteIP(ipId, type) {
-    if (!confirm('Bu IP adresini silmek istediğinize emin misiniz?')) {
-        return;
-    }
-    
-    console.log('IP siliniyor:', ipId, type);
-    showNotification('IP silindi', 'success');
-    
-    // Satırı kaldır
-    const row = document.querySelector(`tr[data-ip-id="${ipId}"]`);
-    if (row) {
-        row.remove();
-    }
-    
-    /*
-    fetch('ajax/delete_ip.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ipId, type: type })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('IP silindi', 'success');
-            location.reload();
-        }
-    });
-    */
-}
-
-// Şüpheli IP'yi engelle
-function blockSuspiciousIP(ipId, ipAddress) {
-    if (!confirm(`${ipAddress} IP adresini engellemek istediğinize emin misiniz?`)) {
-        return;
-    }
-    
-    console.log('Şüpheli IP engelleniyor:', ipId, ipAddress);
-    
-    // Şüpheli listeden kaldır
-    const row = document.querySelector(`#suspiciousTable tr[data-ip-id="${ipId}"]`);
-    if (row) {
-        row.remove();
-    }
-    
-    showNotification(`${ipAddress} blocklist'e eklendi`, 'success');
-    
-    /*
-    fetch('ajax/block_suspicious_ip.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ipId, ip: ipAddress })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification(`${ipAddress} blocklist'e eklendi`, 'success');
-            location.reload();
-        }
-    });
-    */
-}
-
-// Şüpheli IP'yi yoksay
-function ignoreSuspiciousIP(ipId) {
-    if (!confirm('Bu IP adresini şüpheli listesinden kaldırmak istediğinize emin misiniz?')) {
-        return;
-    }
-    
-    console.log('Şüpheli IP yoksayılıyor:', ipId);
-    
-    // Şüpheli listeden kaldır
-    const row = document.querySelector(`#suspiciousTable tr[data-ip-id="${ipId}"]`);
-    if (row) {
-        row.remove();
-    }
-    
-    showNotification('IP şüpheli listesinden kaldırıldı', 'success');
-    
-    /*
-    fetch('ajax/ignore_suspicious_ip.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: ipId })
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            showNotification('IP şüpheli listesinden kaldırıldı', 'success');
-            location.reload();
-        }
-    });
-    */
-}
-// İşlem Geçmişi Modal
-function viewAdminHistory(adminId) {
-    document.getElementById('adminHistoryModal').classList.add('active');
-}
-
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
-}

@@ -1,23 +1,31 @@
 <?php
-session_start();
+require_once 'entegrasyon/config.php';
 
-// Giriş kontrolü
-if (!isset($_SESSION['admin_logged_in']) || $_SESSION['admin_logged_in'] !== true) {
-    header('Location: giris.php');
-    exit;
-}
+// Admin oturum kontrolü
+checkAdminAuth();
 
 // Aktif sayfa tespiti
 $current_page = basename($_SERVER['PHP_SELF']);
+
+// Logo ve site bilgilerini çek
+$logoUrl = getLogoUrl();
+$faviconUrl = getFaviconUrl();
+$siteName = getSiteName();
+
+// Admin bilgilerini çek
+$adminInfo = getAdminInfo();
 ?>
 <!DOCTYPE html>
 <html lang="tr">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title><?php echo $page_title ?? 'Admin Panel'; ?> - Eğitim Platformu</title>
+    <title><?php echo isset($page_title) ? $page_title . ' - ' : ''; ?><?php echo $siteName; ?> - Admin Panel</title>
     <link rel="stylesheet" href="assets/css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <?php if ($faviconUrl): ?>
+    <link rel="icon" type="image/png" href="<?php echo $faviconUrl; ?>">
+    <?php endif; ?>
 </head>
 <body>
     <div class="admin-wrapper">
@@ -28,7 +36,11 @@ $current_page = basename($_SERVER['PHP_SELF']);
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="logo-container" id="logoContainer">
-                    <img src="assets/img/logo.png" alt="Logo" class="sidebar-logo" onerror="this.style.display='none'">
+                    <?php if ($logoUrl): ?>
+                        <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>" class="sidebar-logo">
+                    <?php else: ?>
+                        <div style="color: #3b82f6; font-size: 2rem;"><i class="fas fa-graduation-cap"></i></div>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -97,6 +109,10 @@ $current_page = basename($_SERVER['PHP_SELF']);
                     <i class="fas fa-bars"></i>
                 </button>
                 <div class="header-logo" id="headerLogo">
-                    <img src="assets/img/logo.png" alt="Logo" class="header-logo-img" onerror="this.style.display='none'">
+                    <?php if ($logoUrl): ?>
+                        <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>" class="header-logo-img">
+                    <?php else: ?>
+                        <span style="color: #3b82f6; font-size: 1.5rem;"><i class="fas fa-graduation-cap"></i></span>
+                    <?php endif; ?>
                 </div>
             </div>

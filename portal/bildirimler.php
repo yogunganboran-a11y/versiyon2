@@ -1,71 +1,58 @@
 <?php
-session_start();
+require_once 'includes/auth-check.php';
 
-// Giriş kontrolü
-if (!isset($_SESSION['user_logged_in']) || $_SESSION['user_logged_in'] !== true) {
-    header('Location: giris.php');
-    exit;
-}
-
-// Sayfa bilgileri
 $page_title = 'Bildirimler';
 $page_css = 'assets/css/bildirimler.css';
 
-// Site ayarları
-define('SITE_NAME', 'Eğitim Portalı');
+$userId = $_SESSION['user_id'];
 
-function setPageTitle($title) {
-    return $title . ' - ' . SITE_NAME;
+// SMS geçmişinden bildirimleri çek
+$notifications = fetchAll("
+    SELECT
+        id,
+        phone,
+        message,
+        status,
+        created_at
+    FROM sms_history
+    WHERE phone = (SELECT phone FROM users WHERE id = ?)
+    ORDER BY created_at DESC
+    LIMIT 50
+", [$userId]);
+
+// Bildirim tipini belirle
+function getNotificationType($message) {
+    $lowerMsg = mb_strtolower($message, 'UTF-8');
+    if (strpos($lowerMsg, 'başarı') !== false || strpos($lowerMsg, 'onay') !== false || strpos($lowerMsg, 'tamamland') !== false) {
+        return ['type' => 'success', 'icon' => 'fa-check-circle'];
+    } elseif (strpos($lowerMsg, 'uyarı') !== false || strpos($lowerMsg, 'dikkat') !== false || strpos($lowerMsg, 'hatırlat') !== false) {
+        return ['type' => 'warning', 'icon' => 'fa-exclamation-triangle'];
+    } elseif (strpos($lowerMsg, 'hata') !== false || strpos($lowerMsg, 'iptal') !== false || strpos($lowerMsg, 'başarısız') !== false) {
+        return ['type' => 'error', 'icon' => 'fa-times-circle'];
+    } else {
+        return ['type' => 'info', 'icon' => 'fa-info-circle'];
+    }
+}
+
+// Zaman farkı hesapla
+function timeAgoNotif($datetime) {
+    $now = new DateTime();
+    $ago = new DateTime($datetime);
+    $diff = $now->diff($ago);
+
+    if ($diff->y > 0) return $diff->y . ' yıl önce';
+    if ($diff->m > 0) return $diff->m . ' ay önce';
+    if ($diff->d > 0) {
+        if ($diff->d == 1) return 'Dün';
+        if ($diff->d < 7) return $diff->d . ' gün önce';
+        return floor($diff->d / 7) . ' hafta önce';
+    }
+    if ($diff->h > 0) return $diff->h . ' saat önce';
+    if ($diff->i > 0) return $diff->i . ' dakika önce';
+    return 'Az önce';
 }
 
 include 'includes/header.php';
-
-// Demo bildirim verileri
-$notifications = [];
-$types = ['success', 'info', 'warning', 'error'];
-$icons = ['fa-check-circle', 'fa-video', 'fa-file-alt', 'fa-bell', 'fa-graduation-cap', 'fa-certificate', 'fa-user', 'fa-comment'];
-$messages = [
-    ['type' => 'success', 'icon' => 'fa-check-circle', 'text' => 'Testiniz başarıyla tamamlandı', 'details' => 'Python Web Geliştirme testinde %85 başarı ile geçtiniz.'],
-    ['type' => 'info', 'icon' => 'fa-video', 'text' => 'Yeni video eklendi', 'details' => 'Python Web Geliştirme kursuna 3 yeni video eklendi.'],
-    ['type' => 'warning', 'icon' => 'fa-file-alt', 'text' => 'Sertifikanız hazır', 'details' => 'Python Web Geliştirme sertifikanız indirmeye hazır.'],
-    ['type' => 'info', 'icon' => 'fa-graduation-cap', 'text' => 'Eğitim kaydınız onaylandı', 'details' => 'React Native Mobil Geliştirme eğitimine kaydınız onaylandı.'],
-    ['type' => 'success', 'icon' => 'fa-certificate', 'text' => 'Yeni sertifika alındı', 'details' => 'JavaScript Temelleri kursunu başarıyla tamamladınız.'],
-    ['type' => 'info', 'icon' => 'fa-bell', 'text' => 'Hatırlatma: Test zamanı', 'details' => 'Python Web Geliştirme ara sınav yarın başlıyor.'],
-    ['type' => 'success', 'icon' => 'fa-check-circle', 'text' => 'Ödemeniz alındı', 'details' => 'React Native Mobil Geliştirme kurs ödemesi başarıyla alındı.'],
-    ['type' => 'warning', 'icon' => 'fa-file-alt', 'text' => 'Eksik bilgi', 'details' => 'Profil bilgilerinizi tamamlayınız.'],
-    ['type' => 'info', 'icon' => 'fa-comment', 'text' => 'Yeni mesaj', 'details' => 'Eğitmeniniz size bir mesaj gönderdi.'],
-    ['type' => 'success', 'icon' => 'fa-video', 'text' => 'Video izleme ilerlemeniz kaydedildi', 'details' => 'Python Web Geliştirme - Ders 5 izlendi.']
-];
-
-$times = [
-    '2 saat önce',
-    '5 saat önce',
-    '1 gün önce',
-    '2 gün önce',
-    '3 gün önce',
-    '5 gün önce',
-    '1 hafta önce',
-    '2 hafta önce',
-    '3 hafta önce',
-    '1 ay önce'
-];
-
-// 30 bildirim oluştur
-for ($i = 0; $i < 30; $i++) {
-    $msgIndex = $i % 10;
-    $timeIndex = $i % 10;
-
-    $notifications[] = [
-        'id' => $i + 1,
-        'type' => $messages[$msgIndex]['type'],
-        'icon' => $messages[$msgIndex]['icon'],
-        'text' => $messages[$msgIndex]['text'],
-        'details' => $messages[$msgIndex]['details'],
-        'time' => $times[$timeIndex],
-        'unread' => $i < 8, // İlk 8 bildirim okunmamış
-        'timestamp' => time() - ($i * 3600)
-    ];
-}
 ?>
 
 <link rel="stylesheet" href="assets/css/bildirimler.css">
@@ -80,31 +67,34 @@ for ($i = 0; $i < 30; $i++) {
             </h1>
             <p class="page-subtitle">Tüm bildirimlerinizi bu sayfadan görüntüleyebilirsiniz</p>
         </div>
+    </div>
 
     <!-- Bildirim Listesi -->
-    <div class="notifications-list" id="notificationsList">
-        <?php foreach ($notifications as $notif): ?>
-        <div class="notification-card <?php echo $notif['unread'] ? 'unread' : ''; ?>"
+    <div class="notifications-list" id="notificationsList" style="<?php echo empty($notifications) ? 'display: none;' : ''; ?>">
+        <?php foreach ($notifications as $notif):
+            $notifType = getNotificationType($notif['message']);
+            $statusClass = $notif['status'] == 'sent' ? 'success' : ($notif['status'] == 'failed' ? 'error' : 'info');
+        ?>
+        <div class="notification-card"
              data-id="<?php echo $notif['id']; ?>"
-             data-type="<?php echo $notif['type']; ?>"
-             data-unread="<?php echo $notif['unread'] ? 'true' : 'false'; ?>">
+             data-type="<?php echo $notifType['type']; ?>">
 
             <div class="notification-indicator"></div>
 
             <div class="notification-icon-wrapper">
-                <div class="notification-icon <?php echo $notif['type']; ?>">
-                    <i class="fas <?php echo $notif['icon']; ?>"></i>
+                <div class="notification-icon <?php echo $notifType['type']; ?>">
+                    <i class="fas <?php echo $notifType['icon']; ?>"></i>
                 </div>
             </div>
 
             <div class="notification-body">
                 <div class="notification-text">
-                    <strong><?php echo $notif['text']; ?></strong>
-                    <p><?php echo $notif['details']; ?></p>
+                    <strong><?php echo htmlspecialchars($notif['message']); ?></strong>
+                    <p><?php echo htmlspecialchars($notif['phone']); ?> numarasına gönderildi</p>
                 </div>
                 <div class="notification-time">
                     <i class="far fa-clock"></i>
-                    <?php echo $notif['time']; ?>
+                    <?php echo timeAgoNotif($notif['created_at']); ?>
                 </div>
             </div>
 
@@ -113,7 +103,7 @@ for ($i = 0; $i < 30; $i++) {
     </div>
 
     <!-- Boş Durum -->
-    <div class="empty-state" id="emptyState" style="display: none;">
+    <div class="empty-state" id="emptyState" style="<?php echo empty($notifications) ? '' : 'display: none;'; ?>">
         <div class="empty-icon">
             <i class="fas fa-bell-slash"></i>
         </div>

@@ -1,8 +1,8 @@
 <?php
 require_once 'config.php';
 
-// Oturum kontrolü yap
-checkAuth();
+// Kullanıcı oturumu kontrolü
+checkUserAuth();
 
 // Kullanıcı bilgilerini al
 $user = getUserInfo();

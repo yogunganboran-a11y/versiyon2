@@ -1,36 +1,34 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'Telefon';
-include 'includes/header.php';
 
-// Demo arama verileri
-$calls = [];
-$types = ['incoming', 'outgoing'];
-$typeLabels = ['Gelen', 'Giden'];
-$durations = ['2:15', '5:42', '1:30', '8:45', '3:20', '6:10', '12:05', '4:18'];
-
-for ($i = 1; $i <= 100; $i++) {
-    $typeIndex = ($i - 1) % 2;
-    $type = $types[$typeIndex];
-    
-    $phoneBase = 530 + ($i % 10);
-    $phoneMid = str_pad($i, 3, '0', STR_PAD_LEFT);
-    $phoneEnd = str_pad($i * 10, 4, '0', STR_PAD_LEFT);
-    
-    $calls[] = [
-        'id' => $i,
-        'phone' => "+90 {$phoneBase} {$phoneMid} {$phoneEnd}",
-        'type' => $type,
-        'type_label' => $typeLabels[$typeIndex],
-        'date' => date('d.m.Y H:i', strtotime("-{$i} hours")),
-        'duration' => $durations[($i - 1) % 8],
-        'has_recording' => true
-    ];
-}
+// Telefon aramalarını veritabanından çek
+$calls = fetchAll("
+    SELECT
+        pc.*,
+        u.name,
+        u.surname,
+        u.phone
+    FROM phone_calls pc
+    LEFT JOIN users u ON pc.user_id = u.id
+    ORDER BY pc.created_at DESC
+    LIMIT 200
+");
 
 // İstatistikler
-$total_calls = count($calls);
-$incoming_calls = count(array_filter($calls, fn($c) => $c['type'] === 'incoming'));
-$outgoing_calls = count(array_filter($calls, fn($c) => $c['type'] === 'outgoing'));
+$total_calls = fetchOne("SELECT COUNT(*) as count FROM phone_calls")['count'] ?? 0;
+$incoming_calls = fetchOne("SELECT COUNT(*) as count FROM phone_calls WHERE direction = 'incoming'")['count'] ?? 0;
+$outgoing_calls = fetchOne("SELECT COUNT(*) as count FROM phone_calls WHERE direction = 'outgoing'")['count'] ?? 0;
+
+// Süreyi formatla
+function formatDuration($seconds) {
+    if (!$seconds) return '0:00';
+    $minutes = floor($seconds / 60);
+    $secs = $seconds % 60;
+    return sprintf('%d:%02d', $minutes, $secs);
+}
 ?>
 
 <link rel="stylesheet" href="assets/css/telefon.css">
@@ -125,33 +123,44 @@ $outgoing_calls = count(array_filter($calls, fn($c) => $c['type'] === 'outgoing'
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($calls as $call): ?>
-                <tr data-type="<?php echo $call['type']; ?>" onclick="showCallDetails(<?php echo $call['id']; ?>)">
-                    <td><?php echo $call['date']; ?></td>
-                    <td>
-                        <span class="phone-number"><?php echo $call['phone']; ?></span>
-                    </td>
-                    <td>
-                        <span class="call-type <?php echo $call['type']; ?>">
-                            <i class="fas fa-<?php echo $call['type'] === 'incoming' ? 'phone-alt' : ($call['type'] === 'outgoing' ? 'phone' : 'phone-slash'); ?>"></i>
-                            <?php echo $call['type_label']; ?>
-                        </span>
-                    </td>
-                    <td>
-                        <span class="duration-badge">
-                            <i class="far fa-clock"></i>
-                            <?php echo $call['duration']; ?>
-                        </span>
-                    </td>
-                    <td>
-                        <?php if ($call['has_recording']): ?>
-                        <i class="fas fa-microphone" style="color: #10b981;" title="Kayıt mevcut"></i>
-                        <?php else: ?>
-                        <i class="fas fa-times" style="color: #ef4444;" title="Kayıt yok"></i>
-                        <?php endif; ?>
+                <?php if (empty($calls)): ?>
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 2rem; color: #8b9cbc;">
+                        Henüz telefon araması kaydı bulunmuyor
                     </td>
                 </tr>
-                <?php endforeach; ?>
+                <?php else: ?>
+                    <?php foreach ($calls as $call):
+                        $typeLabels = ['incoming' => 'Gelen', 'outgoing' => 'Giden', 'missed' => 'Cevapsız'];
+                        $typeLabel = $typeLabels[$call['direction']] ?? 'Bilinmiyor';
+                    ?>
+                    <tr data-type="<?php echo $call['direction']; ?>" onclick="showCallDetails(<?php echo $call['id']; ?>)">
+                        <td><?php echo date('d.m.Y H:i', strtotime($call['created_at'])); ?></td>
+                        <td>
+                            <span class="phone-number"><?php echo htmlspecialchars($call['phone'] ?? 'Bilinmiyor'); ?></span>
+                        </td>
+                        <td>
+                            <span class="call-type <?php echo $call['direction']; ?>">
+                                <i class="fas fa-<?php echo $call['direction'] === 'incoming' ? 'phone-alt' : ($call['direction'] === 'outgoing' ? 'phone' : 'phone-slash'); ?>"></i>
+                                <?php echo $typeLabel; ?>
+                            </span>
+                        </td>
+                        <td>
+                            <span class="duration-badge">
+                                <i class="far fa-clock"></i>
+                                <?php echo formatDuration($call['duration'] ?? 0); ?>
+                            </span>
+                        </td>
+                        <td>
+                            <?php if (!empty($call['recording_url'])): ?>
+                            <i class="fas fa-microphone" style="color: #10b981;" title="Kayıt mevcut"></i>
+                            <?php else: ?>
+                            <i class="fas fa-times" style="color: #ef4444;" title="Kayıt yok"></i>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
             </tbody>
         </table>
     </div>

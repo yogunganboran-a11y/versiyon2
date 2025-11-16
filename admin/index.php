@@ -1,6 +1,24 @@
 <?php
 $page_title = 'Satışlar';
 include 'includes/header.php';
+
+// Veritabanından istatistikleri çek
+$stats = fetchOne("SELECT
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'online' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as online_count,
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'transfer' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as transfer_count,
+    (SELECT COUNT(*) FROM payments WHERE payment_method = 'company' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as company_count,
+    (SELECT COUNT(*) FROM payments WHERE DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as total_count,
+    (SELECT SUM(amount) FROM payments WHERE status = 'completed' AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)) as total_revenue
+") ?? ['online_count' => 0, 'transfer_count' => 0, 'company_count' => 0, 'total_count' => 0, 'total_revenue' => 0];
+
+// Son satışları çek
+$recentSales = fetchAll("SELECT p.*, u.name, u.surname, u.tckn, c.title as course_title
+    FROM payments p
+    LEFT JOIN users u ON p.user_id = u.id
+    LEFT JOIN courses c ON p.course_id = c.id
+    WHERE p.status = 'completed'
+    ORDER BY p.created_at DESC
+    LIMIT 20");
 ?>
 
 <!-- Page Header -->
@@ -49,8 +67,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Online Kayıtlar</div>
-            <div class="stat-value">156</div>
-            <div class="stat-description">+8% geçen haftaya göre</div>
+            <div class="stat-value"><?php echo $stats['online_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -61,8 +79,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Havale Kayıtları</div>
-            <div class="stat-value">24</div>
-            <div class="stat-description">+12% geçen haftaya göre</div>
+            <div class="stat-value"><?php echo $stats['transfer_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -73,8 +91,8 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Firma Kayıtları</div>
-            <div class="stat-value">8</div>
-            <div class="stat-description">+3 yeni firma</div>
+            <div class="stat-value"><?php echo $stats['company_count']; ?></div>
+            <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
     
@@ -85,7 +103,7 @@ include 'includes/header.php';
         </div>
         <div class="stat-content">
             <div class="stat-label">Toplam Kayıtlar</div>
-            <div class="stat-value">188</div>
+            <div class="stat-value"><?php echo $stats['total_count']; ?></div>
             <div class="stat-description">Son 7 gün</div>
         </div>
     </div>
@@ -296,6 +314,27 @@ include 'includes/header.php';
     </div>
     
     <!-- Firma Satışları -->
+    <?php
+    $companySales = fetchAll("SELECT
+        p.company_name,
+        c.title as course_title,
+        COUNT(*) as student_count,
+        SUM(p.amount) as total_amount
+        FROM payments p
+        LEFT JOIN courses c ON p.course_id = c.id
+        WHERE p.payment_method = 'company' AND p.status = 'completed'
+        AND DATE(p.created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
+        GROUP BY p.company_name, p.course_id
+        ORDER BY total_amount DESC");
+
+    $companyTotal = fetchOne("SELECT
+        COUNT(*) as count,
+        SUM(amount) as total
+        FROM payments
+        WHERE payment_method = 'company' AND status = 'completed'
+        AND DATE(created_at) >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)")
+        ?? ['count' => 0, 'total' => 0];
+    ?>
     <div style="background: rgba(20, 184, 166, 0.1); border-left: 4px solid #14b8a6; border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem;">
         <div style="margin-bottom: 1rem;">
             <h3 style="font-size: 1.1rem; font-weight: 600; color: #14b8a6; margin-bottom: 0.5rem;">
@@ -303,49 +342,35 @@ include 'includes/header.php';
             </h3>
             <p style="font-size: 0.9rem; color: var(--text-secondary);">Toplu eğitim alımları</p>
         </div>
-        
+
         <!-- Firma Listesi -->
         <div style="display: grid; gap: 0.75rem;">
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">ABC Lojistik Ltd. Şti.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">15 kişi - İSG Eğitimi</div>
+            <?php if (empty($companySales)): ?>
+                <div style="text-align: center; padding: 1rem; color: var(--text-secondary);">
+                    Henüz firma satışı bulunmuyor
                 </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">15 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">6.750 ₺</div>
+            <?php else: ?>
+                <?php foreach ($companySales as $sale): ?>
+                <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;"><?php echo htmlspecialchars($sale['company_name'] ?? 'Firma Adı Yok'); ?></div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);"><?php echo $sale['student_count']; ?> kişi - <?php echo htmlspecialchars($sale['course_title']); ?></div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;"><?php echo $sale['student_count']; ?> Adet</div>
+                        <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;"><?php echo number_format($sale['total_amount'], 0, ',', '.'); ?> ₺</div>
+                    </div>
                 </div>
-            </div>
-            
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">XYZ İnşaat A.Ş.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">8 kişi - Forklift + İSG</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">8 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">4.800 ₺</div>
-                </div>
-            </div>
-            
-            <div style="background: rgba(255, 255, 255, 0.03); border-radius: 8px; padding: 1rem; display: flex; justify-content: space-between; align-items: center;">
-                <div>
-                    <div style="font-weight: 600; color: var(--text-primary); margin-bottom: 0.25rem;">Mega Depo Tic. Ltd.</div>
-                    <div style="font-size: 0.85rem; color: var(--text-secondary);">5 kişi - İSG Eğitimi</div>
-                </div>
-                <div style="text-align: right;">
-                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">5 Adet</div>
-                    <div style="font-size: 1.25rem; font-weight: 700; color: #14b8a6;">2.250 ₺</div>
-                </div>
-            </div>
+                <?php endforeach; ?>
+            <?php endif; ?>
         </div>
-        
+
         <!-- Firma Toplamı -->
         <div style="margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(20, 184, 166, 0.2); display: flex; justify-content: space-between; align-items: center;">
             <div style="font-weight: 600; color: var(--text-primary);">Toplam Firma Satışları</div>
             <div style="text-align: right;">
-                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;">28 Adet</div>
-                <div style="font-size: 1.5rem; font-weight: 700; color: #14b8a6;">13.800 ₺</div>
+                <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.25rem;"><?php echo $companyTotal['count']; ?> Adet</div>
+                <div style="font-size: 1.5rem; font-weight: 700; color: #14b8a6;"><?php echo number_format($companyTotal['total'] ?? 0, 0, ',', '.'); ?> ₺</div>
             </div>
         </div>
     </div>

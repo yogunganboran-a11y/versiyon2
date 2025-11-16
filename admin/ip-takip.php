@@ -1,42 +1,29 @@
 <?php
+require_once 'entegrasyon/config.php';
+checkAdminAuth();
+
 $page_title = 'IP Takip';
-include 'includes/header.php';
 
-// Demo IP verileri
-$ip_data = [];
-$ips = ['192.168.1.', '10.0.0.', '172.16.0.', '203.0.113.'];
-$devices = ['Desktop', 'Mobile', 'Tablet'];
-$browsers = ['Chrome', 'Firefox', 'Safari', 'Edge'];
-$locations = ['İstanbul, TR', 'Ankara, TR', 'İzmir, TR', 'Bursa, TR', 'Antalya, TR'];
-
-for ($i = 1; $i <= 100; $i++) {
-    $ip = $ips[array_rand($ips)] . rand(1, 254);
-    $visits = rand(1, 50);
-    
-    $ip_data[] = [
-        'id' => $i,
-        'ip' => $ip,
-        'visits' => $visits,
-        'location' => $locations[array_rand($locations)],
-        'device' => $devices[array_rand($devices)],
-        'browser' => $browsers[array_rand($browsers)],
-        'os' => 'Windows 11',
-        'last_visit' => date('d.m.Y H:i', strtotime("-" . rand(0, 72) . " hours")),
-        'first_visit' => date('d.m.Y H:i', strtotime("-" . rand(1, 30) . " days")),
-        'pages' => [
-            ['url' => '/index.php', 'time' => date('d.m.Y H:i', strtotime("-1 hour"))],
-            ['url' => '/egitimler.php', 'time' => date('d.m.Y H:i', strtotime("-2 hours"))],
-            ['url' => '/iletisim.php', 'time' => date('d.m.Y H:i', strtotime("-3 hours"))]
-        ]
-    ];
-}
+// IP loglarını veritabanından çek
+$ip_data = fetchAll("
+    SELECT
+        ip_address,
+        COUNT(*) as visits,
+        MAX(created_at) as last_visit,
+        MIN(created_at) as first_visit,
+        user_agent,
+        country,
+        city
+    FROM ip_logs
+    GROUP BY ip_address
+    ORDER BY last_visit DESC
+    LIMIT 200
+");
 
 // İstatistikler
-$total_visitors = count($ip_data);
-$total_visits = array_sum(array_column($ip_data, 'visits'));
-$live_visitors = rand(5, 15);
-$ads_visits = round($total_visitors * 0.35);
-$buyers_visits = round($total_visitors * 0.18);
+$total_visitors = fetchOne("SELECT COUNT(DISTINCT ip_address) as count FROM ip_logs")['count'] ?? 0;
+$total_visits = fetchOne("SELECT COUNT(*) as count FROM ip_logs")['count'] ?? 0;
+$live_visitors = fetchOne("SELECT COUNT(DISTINCT ip_address) as count FROM ip_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 5 MINUTE)")['count'] ?? 0;
 ?>
 
 <link rel="stylesheet" href="assets/css/ip-tracking.css">

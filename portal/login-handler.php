@@ -1,37 +1,39 @@
 <?php
-session_start();
+require_once 'includes/config.php';
 
-// Demo login handler (backend hazır olana kadar)
+header('Content-Type: application/json');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $tckn = isset($_POST['tckn']) ? trim($_POST['tckn']) : '';
-    
-    // Demo kullanıcılar
-    $demo_users = [
-        '12345678901' => [
-            'tckn' => '12345678901',
-            'ad' => 'Ahmet',
-            'soyad' => 'Yılmaz',
-            'telefon' => '0532 123 4567',
-            'dogum_tarihi' => '15.03.1990',
-            'avatar' => null
-        ],
-        '98765432109' => [
-            'tckn' => '98765432109',
-            'ad' => 'Ayşe',
-            'soyad' => 'Kaya',
-            'telefon' => '0533 234 5678',
-            'dogum_tarihi' => '22.07.1985',
-            'avatar' => null
-        ]
-    ];
-    
-    // Kullanıcı kontrolü
-    if (isset($demo_users[$tckn])) {
-        // Session oluştur
+    $tckn = trim($_POST['tckn'] ?? '');
+
+    // TCKN validasyonu
+    if (empty($tckn)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'TCKN alanı zorunludur'
+        ]);
+        exit;
+    }
+
+    if (strlen($tckn) != 11 || !ctype_digit($tckn)) {
+        echo json_encode([
+            'success' => false,
+            'message' => 'Geçersiz TCKN formatı'
+        ]);
+        exit;
+    }
+
+    // Veritabanından kullanıcıyı çek
+    $user = fetchOne("SELECT * FROM users WHERE tckn = ?", [$tckn]);
+
+    if ($user) {
+        // Kullanıcı bulundu, oturum oluştur
         $_SESSION['user_logged_in'] = true;
-        $_SESSION['user_data'] = $demo_users[$tckn];
-        
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['user_tckn'] = $user['tckn'];
+        $_SESSION['user_name'] = $user['name'];
+        $_SESSION['user_surname'] = $user['surname'];
+
         echo json_encode([
             'success' => true,
             'message' => 'Giriş başarılı'

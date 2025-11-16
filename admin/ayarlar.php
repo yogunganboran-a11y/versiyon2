@@ -2,28 +2,11 @@
 $page_title = 'Ayarlar';
 include 'includes/header.php';
 
-// Demo admin verileri
-$admins = [
-    [
-        'id' => 1,
-        'name' => 'Ahmet Yılmaz',
-        'email' => 'ahmet@example.com',
-        'role' => 'admin',
-        'role_label' => 'Yönetici',
-        'status' => 'active',
-        'last_login' => '2 saat önce',
-        'permissions' => ['dashboard', 'sales', 'customers', 'whatsapp', 'phone', 'courses', 'settings']
-    ],
-    [
-        'id' => 2,
-        'name' => 'Mehmet Demir',
-        'email' => 'mehmet@example.com',
-        'role' => 'moderator',
-        'role_label' => 'Personel',
-        'status' => 'active',
-        'last_login' => '1 gün önce',
-        'permissions' => ['dashboard', 'customers', 'whatsapp', 'courses']
-    ]
+// Veritabanından admin listesini çek
+$admins = fetchAll("SELECT id, full_name as name, email, role, last_login FROM admins ORDER BY created_at DESC");
+
+// Veritabanından mevcut ayarları çek
+$currentSettings = getSettings();
 ];
 
 $all_permissions = [

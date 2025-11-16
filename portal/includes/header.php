@@ -3,18 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title><?php echo isset($page_title) ? setPageTitle($page_title) : SITE_NAME; ?></title>
-    
+    <title><?php echo isset($page_title) ? setPageTitle($page_title) : getSiteName(); ?></title>
+
     <!-- CSS -->
     <link rel="stylesheet" href="assets/css/variables.css">
     <link rel="stylesheet" href="assets/css/layout.css">
     <link rel="stylesheet" href="<?php echo isset($page_css) ? $page_css : 'assets/css/dashboard.css'; ?>">
-    
+
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+
     <!-- Favicon -->
-    <link rel="icon" type="image/png" href="assets/img/logo.png">
+    <?php
+    $faviconUrl = getFaviconUrl();
+    if ($faviconUrl):
+    ?>
+    <link rel="icon" type="image/png" href="<?php echo $faviconUrl; ?>">
+    <?php endif; ?>
 </head>
 <body>
     <!-- Mobil Overlay -->
@@ -35,8 +40,16 @@
 
                 <!-- Logo -->
                 <div class="header-logo">
-                    <img src="assets/img/logo.png" alt="Logo" onerror="this.style.display='none'">
-                    <span>Eğitim Portalı</span>
+                    <?php
+                    $logoUrl = getLogoUrl();
+                    $siteName = getSiteName();
+                    if ($logoUrl):
+                    ?>
+                        <img src="<?php echo $logoUrl; ?>" alt="<?php echo $siteName; ?>">
+                    <?php else: ?>
+                        <i class="fas fa-graduation-cap" style="font-size: 1.5rem; color: #3b82f6;"></i>
+                    <?php endif; ?>
+                    <span><?php echo $siteName; ?></span>
                 </div>
             </div>
 
